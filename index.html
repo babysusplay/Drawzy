@@ -1015,6 +1015,36 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
   }
 }
 </style>
+
+<style id="mobile-custom-words-border-fix">
+@media (max-width:650px){
+  body:not(.game-active) .lobby-settings .custom-word-box{
+    box-sizing:border-box!important;
+    overflow:visible!important;
+    height:auto!important;
+    min-height:135px!important;
+    padding:8px!important;
+    border-bottom:1px solid rgba(255,255,255,.12)!important;
+  }
+  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
+    box-sizing:border-box!important;
+    display:block!important;
+    width:100%!important;
+    height:82px!important;
+    min-height:82px!important;
+    max-height:none!important;
+    margin:4px 0 6px!important;
+    overflow-y:auto!important;
+    resize:none!important;
+  }
+  body:not(.game-active) .lobby-settings .custom-word-box .custom-only-toggle{
+    box-sizing:border-box!important;
+    margin-top:2px!important;
+    padding-bottom:0!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
