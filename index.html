@@ -1016,21 +1016,75 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
-
-<style id="mobile-custom-words-border-only">
-@media screen and (max-width:650px) and (orientation:portrait){
+<style id="mobile-custom-words-border-fix">
+@media (max-width:650px){
   body:not(.game-active) .lobby-settings .custom-word-box{
     box-sizing:border-box!important;
     overflow:visible!important;
-    position:relative!important;
-    z-index:2!important;
-    border:1px solid #303764!important;
+    height:auto!important;
+    min-height:135px!important;
+    padding:8px!important;
+    border-bottom:1px solid rgba(255,255,255,.12)!important;
   }
   body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
     box-sizing:border-box!important;
+    display:block!important;
+    width:100%!important;
+    height:82px!important;
+    min-height:82px!important;
+    max-height:none!important;
+    margin:4px 0 6px!important;
     overflow-y:auto!important;
-    overflow-x:hidden!important;
     resize:none!important;
+  }
+  body:not(.game-active) .lobby-settings .custom-word-box .custom-only-toggle{
+    box-sizing:border-box!important;
+    margin-top:2px!important;
+    padding-bottom:0!important;
+  }
+}
+</style>
+
+
+<style id="mobile-custom-words-actual-clip-fix">
+@media screen and (max-width:650px) and (orientation:portrait){
+  /* Let the settings row grow to the real Custom Words height instead of clipping it. */
+  body:not(.game-active) .lobby-shell .lobby-grid{
+    grid-template-rows:auto minmax(118px,1fr)!important;
+  }
+
+  body:not(.game-active) .lobby-center{
+    overflow:visible!important;
+  }
+
+  body:not(.game-active) .lobby-settings{
+    overflow:visible!important;
+  }
+
+  body:not(.game-active) .lobby-settings .custom-word-box{
+    box-sizing:border-box!important;
+    flex:0 0 125px!important;
+    height:125px!important;
+    min-height:125px!important;
+    max-height:125px!important;
+    overflow:hidden!important;
+  }
+
+  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
+    box-sizing:border-box!important;
+    flex:0 0 76px!important;
+    width:100%!important;
+    height:76px!important;
+    min-height:76px!important;
+    max-height:76px!important;
+    margin:4px 0 4px!important;
+    overflow-y:auto!important;
+  }
+
+  body:not(.game-active) .lobby-settings .custom-only-toggle{
+    flex:0 0 auto!important;
+    min-height:14px!important;
+    margin-top:2px!important;
   }
 }
 </style>
