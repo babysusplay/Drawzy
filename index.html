@@ -1090,14 +1090,39 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 </style>
 
 
-<style id="mobile-players-roomchat-taller-only">
+<style id="mobile-players-chat-keyboard-fix">
 @media screen and (max-width:650px) and (orientation:portrait){
+  /* Use the existing lower row instead of creating extra document height. */
   body:not(.game-active) .lobby-grid{
     grid-template-rows:auto minmax(155px,1fr)!important;
+    min-height:0!important;
   }
+
   body:not(.game-active) .lobby-players,
   body:not(.game-active) .lobby-chat{
     min-height:155px!important;
+    height:100%!important;
+    min-width:0!important;
+  }
+
+  /* Keep the chat bar anchored to the lobby viewport. */
+  body:not(.game-active) .lobby-shell{
+    position:relative!important;
+    overflow:hidden!important;
+  }
+
+  body:not(.game-active) .mobile-chat-bar{
+    position:absolute!important;
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    transform:none!important;
+    z-index:20!important;
+  }
+
+  /* Don't let input focus scroll the page/lobby itself. */
+  body:not(.game-active) .mobile-chat-bar input{
+    scroll-margin:0!important;
   }
 }
 </style>
