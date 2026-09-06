@@ -1045,6 +1045,19 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
+
+<style id="mobile-lobby-panels-down-only">
+/* Only move the Players + Room Chat panels slightly downward on mobile.
+   No desktop changes. */
+@media screen and (max-width:650px) and (orientation:portrait){
+  body:not(.game-active) .lobby-players,
+  body:not(.game-active) .lobby-chat{
+    position:relative!important;
+    top:12px!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
