@@ -591,6 +591,18 @@ body.no-site-header .screen{padding-top:8px!important}
 </style>
 
 
+<style id="desktop-canvas-and-reaction-fix">
+/* Desktop: use the unused lower viewport space for a larger drawing canvas. */
+@media (min-width:821px){
+  .game-active .room-layout{height:calc(100vh - 105px)!important;min-height:0!important;}
+  .game-active .stage-card,.game-active .side,.game-active .chat{height:100%!important;min-height:0!important;}
+  .game-active .stage-card .canvas-wrap{min-height:0!important;}
+  .game-active .stage-card .canvas-wrap canvas{min-height:0!important;}
+}
+/* Each player can submit only one reaction per drawing turn. */
+.react-btn.reaction-locked{opacity:.55!important;cursor:not-allowed!important;transform:none!important;}
+</style>
+
 <style id="drawzy-requested-layout">
 /* Requested layout: keep the uploaded theme/graphics; rearrange space only. */
 @media(max-width:820px){
@@ -1225,8 +1237,12 @@ function renderGame(){
 }
 function setTool(tool){state.eraser=false;state.tool=tool;state.shape='none';['pencil','brush','eraser'].forEach(id=>{$('#'+id)?.classList.remove('active')});$('#'+tool)?.classList.add('active')}
 function reactDrawing(type){
-  if(type==='like'){SOUND.like();state.game.likes=(state.game.likes||0)+1;state.game.dislikes=Math.max(0,(state.game.dislikes||0)-1);$('#likeBtn')?.classList.add('active-like');$('#dislikeBtn')?.classList.remove('active-dislike')}
-  else{SOUND.dislike();state.game.dislikes=(state.game.dislikes||0)+1;state.game.likes=Math.max(0,(state.game.likes||0)-1);$('#dislikeBtn')?.classList.add('active-dislike');$('#likeBtn')?.classList.remove('active-like')}
+  // One reaction per player per drawing turn. Repeated clicks do nothing.
+  if(state.game.myReaction)return;
+  state.game.myReaction=type;
+  if(type==='like'){SOUND.like();state.game.likes=(state.game.likes||0)+1;$('#likeBtn')?.classList.add('active-like')}
+  else{SOUND.dislike();state.game.dislikes=(state.game.dislikes||0)+1;$('#dislikeBtn')?.classList.add('active-dislike')}
+  $('#likeBtn')?.classList.add('reaction-locked');$('#dislikeBtn')?.classList.add('reaction-locked');
   if($('#likeCount'))$('#likeCount').textContent=state.game.likes;if($('#dislikeCount'))$('#dislikeCount').textContent=state.game.dislikes;
 }
 let choiceTimer=null;
@@ -1244,7 +1260,7 @@ function skipCurrentTurn(){
 
 
 function startGame(){
-  state.game={round:1,turn:0,drawer:null,word:'',choices:[],display:'',time:state.settings.drawTime,points:{},correct:[],drawing:false,started:true,finished:false,hintLevel:0,likes:0,dislikes:0};
+  state.game={round:1,turn:0,drawer:null,word:'',choices:[],display:'',time:state.settings.drawTime,points:{},correct:[],drawing:false,started:true,finished:false,hintLevel:0,likes:0,dislikes:0,myReaction:null};
   state.players.forEach(p=>{p.score=0;p.correct=false});
   state.screen='game';pickDrawer();
 }
@@ -1256,7 +1272,7 @@ function pickDrawer(){
   const idx=state.game.turn%Math.max(1,state.players.length);state.game.drawer=state.players[idx]?.name||state.name;
   const pool=getWordPool();const count=Math.max(2,Math.min(4,Number(state.settings.wordCount)||3));
   const shuffled=[...pool].sort(()=>Math.random()-.5);state.game.choices=shuffled.slice(0,count);
-  state.game.word='';state.game.hintLevel=0;state.game.display='';state.game.time=state.settings.drawTime;state.game.correct=[];state.game.drawing=false;state.game.likes=0;state.game.dislikes=0;
+  state.game.word='';state.game.hintLevel=0;state.game.display='';state.game.time=state.settings.drawTime;state.game.correct=[];state.game.drawing=false;state.game.likes=0;state.game.dislikes=0;state.game.myReaction=null;
   render();
 }
 
