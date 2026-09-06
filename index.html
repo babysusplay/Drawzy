@@ -940,6 +940,24 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
+<style id="mobile-portrait-final-polish">
+/* Final requested mobile-only polish. Desktop remains untouched. */
+@media screen and (max-width:650px) and (orientation:portrait){
+  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
+    overflow:hidden!important;
+    resize:none!important;
+    scrollbar-width:none!important;
+  }
+  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea::-webkit-scrollbar{
+    width:0!important;
+    height:0!important;
+    display:none!important;
+  }
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar{
+    bottom:13px!important;
+  }
+}
+</style>
 </head>
 <body>
 <div class="app"><div class="shell">
