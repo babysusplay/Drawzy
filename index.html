@@ -940,21 +940,78 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
-<style id="mobile-portrait-final-polish">
-/* Final requested mobile-only polish. Desktop remains untouched. */
+<style id="mobile-two-fixes-final">
+/* Only the two requested mobile fixes. Desktop remains unchanged. */
 @media screen and (max-width:650px) and (orientation:portrait){
-  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
+  /* Fix 1: remove the tiny stray line/overflow under Custom Words. */
+  body:not(.game-active) .lobby-settings .custom-word-box{
+    box-sizing:border-box!important;
     overflow:hidden!important;
-    resize:none!important;
-    scrollbar-width:none!important;
   }
-  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea::-webkit-scrollbar{
-    width:0!important;
-    height:0!important;
-    display:none!important;
+  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
+    box-sizing:border-box!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    resize:none!important;
+  }
+
+  /* Fix 2: keep the chat bar fully visible and just slightly higher. */
+  body:not(.game-active) .lobby-shell{
+    position:relative!important;
+    box-sizing:border-box!important;
+    padding-bottom:54px!important;
+    overflow:hidden!important;
   }
   body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar{
-    bottom:13px!important;
+    position:absolute!important;
+    left:4px!important;
+    right:4px!important;
+    bottom:8px!important;
+    z-index:10000!important;
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    width:auto!important;
+    height:46px!important;
+    min-height:46px!important;
+    max-height:46px!important;
+    margin:0!important;
+    padding:3px!important;
+    box-sizing:border-box!important;
+    align-items:center!important;
+    gap:6px!important;
+    border:1px solid #303764!important;
+    border-radius:11px!important;
+    background:rgba(12,16,38,.99)!important;
+    box-shadow:0 -4px 16px rgba(0,0,0,.3)!important;
+  }
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar input#mobileLobbyMsg{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    flex:1 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    height:40px!important;
+    min-height:40px!important;
+    max-height:40px!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+  }
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar button{
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    flex:0 0 44px!important;
+    width:44px!important;
+    min-width:44px!important;
+    height:40px!important;
+    min-height:40px!important;
+    max-height:40px!important;
+    margin:0!important;
+    padding:0!important;
+    align-items:center!important;
+    justify-content:center!important;
   }
 }
 </style>
@@ -1670,63 +1727,3 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 </body>
 </html>
 
-<style id="mobile-chat-bar-and-custom-space-final">
-/* Mobile lobby: give the custom-word area the free space and keep a full-width chat bar visible. */
-@media (max-width:650px){
-  body:not(.game-active) .lobby-shell{
-    display:flex!important;
-    flex-direction:column!important;
-    height:calc(100vh - 16px)!important;
-    min-height:0!important;
-    overflow:hidden!important;
-  }
-  body:not(.game-active) .lobby-shell .lobby-grid{
-    flex:1 1 auto!important;
-    height:auto!important;
-    min-height:0!important;
-    overflow:hidden!important;
-  }
-  body:not(.game-active) .lobby-center{
-    min-height:0!important;
-    overflow:hidden!important;
-  }
-  body:not(.game-active) .lobby-settings{
-    min-height:0!important;
-    flex:1 1 auto!important;
-  }
-  body:not(.game-active) .lobby-settings .custom-word-box{
-    flex:1 1 auto!important;
-    min-height:105px!important;
-  }
-  body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
-    height:76px!important;
-    min-height:76px!important;
-  }
-  body:not(.game-active) .mobile-chat-bar{
-    display:flex!important;
-    flex:0 0 44px!important;
-    width:100%!important;
-    min-height:44px!important;
-    box-sizing:border-box!important;
-    gap:6px!important;
-    margin:5px 0 0!important;
-  }
-  body:not(.game-active) .mobile-chat-bar input{
-    height:44px!important;
-    min-height:44px!important;
-    min-width:0!important;
-    flex:1 1 auto!important;
-    font-size:11px!important;
-    padding:0 11px!important;
-    box-sizing:border-box!important;
-  }
-  body:not(.game-active) .mobile-chat-bar .btn{
-    width:46px!important;
-    min-width:46px!important;
-    height:44px!important;
-    min-height:44px!important;
-    padding:0!important;
-    font-size:16px!important;
-  }
-}
-</style>
