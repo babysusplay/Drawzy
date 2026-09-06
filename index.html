@@ -789,6 +789,77 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
   }
 }
 </style>
+
+<style id="mobile-chat-visibility-final">
+/* FINAL MOBILE FIX: keep the lobby chat input visibly above the bottom browser area.
+   Desktop is intentionally untouched. */
+@media (max-width:650px){
+  body:not(.game-active) .lobby-shell{
+    box-sizing:border-box!important;
+    padding-bottom:52px!important;
+    position:relative!important;
+  }
+
+  body:not(.game-active) .mobile-chat-bar{
+    display:flex!important;
+    position:fixed!important;
+    left:4px!important;
+    right:4px!important;
+    bottom:max(6px, env(safe-area-inset-bottom))!important;
+    z-index:9999!important;
+    width:auto!important;
+    height:46px!important;
+    min-height:46px!important;
+    margin:0!important;
+    padding:3px!important;
+    box-sizing:border-box!important;
+    gap:6px!important;
+    border:1px solid #303764!important;
+    border-radius:11px!important;
+    background:rgba(12,16,38,.98)!important;
+    box-shadow:0 -5px 18px rgba(0,0,0,.28)!important;
+  }
+
+  body:not(.game-active) .mobile-chat-bar input{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    width:auto!important;
+    min-width:0!important;
+    flex:1 1 auto!important;
+    height:40px!important;
+    min-height:40px!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+    font-size:11px!important;
+    padding:0 11px!important;
+  }
+
+  body:not(.game-active) .mobile-chat-bar .btn{
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    align-items:center!important;
+    justify-content:center!important;
+    flex:0 0 44px!important;
+    width:44px!important;
+    min-width:44px!important;
+    height:40px!important;
+    min-height:40px!important;
+    margin:0!important;
+    padding:0!important;
+    font-size:16px!important;
+    line-height:1!important;
+  }
+
+  /* Give the two lower panels enough room above the fixed chat bar. */
+  body:not(.game-active) .lobby-players,
+  body:not(.game-active) .lobby-chat{
+    padding-bottom:52px!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
