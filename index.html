@@ -614,6 +614,54 @@ body.no-site-header .screen{padding-top:8px!important}
 }
 @media(max-width:520px){.game-active .room-layout{grid-template-rows:minmax(0,1fr) minmax(128px,29vh)!important;height:calc(100vh - 58px)!important}.game-active .game-word-area .word{font-size:12px!important}.game-active .side,.game-active .chat{padding:5px!important}.game-active .side .p-name{font-size:9px!important}.game-active .side .p-score{font-size:7px!important}.game-active .chat-form .btn{font-size:0!important;width:30px!important;padding:0!important}.game-active .chat-form .btn:after{content:'➤';font-size:11px!important}}
 </style>
+
+<style id="drawzy-mobile-onewindow">
+/* MOBILE ONLY: compact one-screen lobby/game layout. Desktop is untouched. */
+.mobile-lobby-canvas{display:none}
+@media (max-width:650px){
+  html,body{overflow:hidden!important;height:100%!important}
+  body{min-height:100%!important}
+  .screen{height:100vh!important;overflow:hidden!important}
+
+  /* Private room: settings first, then a compact blank canvas, then 50/50 players + chat. */
+  body:not(.game-active) .lobby-shell{height:calc(100vh - 16px)!important;margin:4px 0 0!important;overflow:hidden!important}
+  body:not(.game-active) .lobby-grid{height:100%!important;display:grid!important;grid-template-columns:1fr 1fr!important;grid-template-rows:auto minmax(105px,1fr)!important;gap:5px!important}
+  body:not(.game-active) .lobby-center{grid-column:1/-1!important;grid-row:1!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+  body:not(.game-active) .lobby-titlebar{flex:0 0 auto!important;margin-bottom:5px!important}
+  body:not(.game-active) .lobby-titlebar h1{font-size:18px!important}
+  body:not(.game-active) .lobby-settings{padding:6px!important;flex:0 0 auto!important}
+  body:not(.game-active) .lobby-settings-head{margin-bottom:4px!important}
+  body:not(.game-active) .lobby-settings .setting-controls{gap:4px!important}
+  body:not(.game-active) .lobby-settings .control-setting{min-height:34px!important;padding:5px 6px!important}
+  body:not(.game-active) .lobby-settings .control-setting b{font-size:8px!important}
+  body:not(.game-active) .lobby-settings .mini-select{font-size:10px!important;padding:4px 5px!important;max-width:78px!important}
+  body:not(.game-active) .lobby-settings .custom-word-box{display:none!important}
+  body:not(.game-active) .room-tools{margin-top:5px!important}
+  body:not(.game-active) .room-tools .btn{min-height:32px!important;font-size:10px!important;padding:0 10px!important}
+  body:not(.game-active) .mobile-lobby-canvas{display:block!important;flex:1 1 auto!important;min-height:80px!important;margin-top:5px!important;background:#fff;border-radius:9px;overflow:hidden}
+  body:not(.game-active) .mobile-lobby-canvas canvas{display:block!important;width:100%!important;height:100%!important;background:#fff!important}
+  body:not(.game-active) .lobby-players{grid-column:1!important;grid-row:2!important;min-height:0!important;height:auto!important;overflow:hidden!important;padding:7px!important}
+  body:not(.game-active) .lobby-chat{grid-column:2!important;grid-row:2!important;min-height:0!important;height:auto!important;padding:7px!important}
+  body:not(.game-active) .lobby-players h3,body:not(.game-active) .lobby-chat h3{font-size:10px!important;margin:1px 0 5px!important}
+  body:not(.game-active) .lobby-players .players{max-height:none!important;overflow:auto!important;gap:3px!important}
+  body:not(.game-active) .lobby-players .waiting{display:none!important}
+  body:not(.game-active) .lobby-players .player{padding:4px!important;gap:4px!important}
+  body:not(.game-active) .lobby-players .p-av{width:23px!important;height:23px!important}
+  body:not(.game-active) .lobby-players .p-name{font-size:9px!important}
+  body:not(.game-active) .lobby-players .p-score{font-size:7px!important}
+  body:not(.game-active) .lobby-chat .chat-log{gap:3px!important}
+  body:not(.game-active) .lobby-chat .msg{font-size:8px!important;padding:4px 5px!important}
+  body:not(.game-active) .lobby-chat .chat-form{margin-top:4px!important;gap:3px!important}
+  body:not(.game-active) .lobby-chat .chat-form input{height:28px!important;font-size:9px!important;padding:0 6px!important}
+  body:not(.game-active) .lobby-chat .chat-form .btn{min-height:28px!important;font-size:9px!important;padding:0 7px!important}
+
+  /* Active game: top info, maximum canvas, then 50/50 leaderboard + chat. */
+  .game-active .screen{height:100vh!important;overflow:hidden!important}
+  .game-active .room-layout{height:calc(100vh - 60px)!important;grid-template-rows:minmax(0,1fr) minmax(128px,30vh)!important}
+  .game-active .stage-card .canvas-wrap{min-height:0!important}
+  .game-active .stage-card .canvas-wrap canvas{height:100%!important;min-height:0!important}
+}
+</style>
 </head>
 <body>
 <div class="app"><div class="shell">
@@ -1179,6 +1227,7 @@ function renderLobby(){
     <div class="lobby-settings compact-settings">${settingsControls}
       <div class="room-tools"><button class="btn danger" id="leave">Leave</button><button class="btn green" id="start">▶ START GAME</button></div>
     </div>
+    <div class="mobile-lobby-canvas" aria-hidden="true"><canvas id="mobileLobbyCanvas"></canvas></div>
    </main>`;
 
   app.innerHTML=`<div class="card room-head"><div class="compact-code"><div><div class="kicker">DRAWZY ROOM</div><div class="code-pill">${esc(state.room.code)}</div></div></div><div class="room-code"><span class="mini-status">● WAITING</span><small>${state.players.length}/${s.players} players • ${isPublic?'min 5 to start':'no minimum'}</small></div><div class="timer">👑 ${esc(state.room.host)}</div></div>
