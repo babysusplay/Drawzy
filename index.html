@@ -1016,44 +1016,21 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
-<style id="mobile-custom-words-border-fix">
-@media (max-width:650px){
+
+<style id="mobile-custom-words-border-only">
+@media screen and (max-width:650px) and (orientation:portrait){
   body:not(.game-active) .lobby-settings .custom-word-box{
     box-sizing:border-box!important;
     overflow:visible!important;
-    height:auto!important;
-    min-height:135px!important;
-    padding:8px!important;
-    border-bottom:1px solid rgba(255,255,255,.12)!important;
+    position:relative!important;
+    z-index:2!important;
+    border:1px solid #303764!important;
   }
   body:not(.game-active) .lobby-settings .custom-word-box .compact-textarea{
     box-sizing:border-box!important;
-    display:block!important;
-    width:100%!important;
-    height:82px!important;
-    min-height:82px!important;
-    max-height:none!important;
-    margin:4px 0 6px!important;
     overflow-y:auto!important;
+    overflow-x:hidden!important;
     resize:none!important;
-  }
-  body:not(.game-active) .lobby-settings .custom-word-box .custom-only-toggle{
-    box-sizing:border-box!important;
-    margin-top:2px!important;
-    padding-bottom:0!important;
-  }
-}
-</style>
-
-
-<style id="mobile-lobby-panels-down-only">
-/* Only move the Players + Room Chat panels slightly downward on mobile.
-   No desktop changes. */
-@media screen and (max-width:650px) and (orientation:portrait){
-  body:not(.game-active) .lobby-players,
-  body:not(.game-active) .lobby-chat{
-    position:relative!important;
-    top:12px!important;
   }
 }
 </style>
