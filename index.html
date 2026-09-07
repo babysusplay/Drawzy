@@ -2124,7 +2124,7 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 (function(){
   const SUPABASE_URL = 'https://wnjsajfahsqunfesmetu.supabase.co';
   // Paste your Supabase PUBLISHABLE key between the quotes below.
-  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_S_ePD9oEegH0R0XR8LGvjQ_sMs9OZSm';
+  const SUPABASE_PUBLISHABLE_KEY = 'PASTE_YOUR_PUBLISHABLE_KEY_HERE';
   if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_PUBLISHABLE_KEY !== 'PASTE_YOUR_PUBLISHABLE_KEY_HERE') {
     window.drawzySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   }
@@ -2140,247 +2140,405 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
   }
 
   const ID_KEY='drawzy_player_id';
-  const getId=()=>{
+  let channel=null, currentCode=null, pollId=null, channelReady=null;
+  let chatHistory=[];
+  let knownPlayerIds=new Set();
+
+  function getId(){
     let id=localStorage.getItem(ID_KEY);
     if(!id){
       id=(crypto.randomUUID?crypto.randomUUID():'p_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));
       localStorage.setItem(ID_KEY,id);
     }
     return id;
-  };
-  const escText=v=>String(v??'');
-  let channel=null, currentCode=null, pollId=null;
-  let chatHistory=[];
-  let knownPlayerIds=new Set();
+  }
 
   function roomCode(){
-    try{return state && state.room && state.room.code ? state.room.code : null;}catch(e){return null;}
+    try{return state && state.room && state.room.code ? state.room.code : null}catch(e){return null}
   }
 
-  function appendChat(name,text,kind=''){
-    const cleanName=escText(name), cleanText=escText(text);
-    chatHistory.push({name:cleanName,text:cleanText,kind});
-    if(chatHistory.length>100) chatHistory.shift();
-    const log=document.getElementById('lobbyChat');
-    if(!log) return;
-    const d=document.createElement('div');
-    d.className='msg '+(kind||'');
-    d.innerHTML='<strong>'+esc(cleanName)+'</strong> '+esc(cleanText);
-    log.appendChild(d);
-    log.scrollTop=log.scrollHeight;
-  }
+  function safe(v){return String(v??'')}
 
-  function redrawChat(){
+  function renderChat(){
     const log=document.getElementById('lobbyChat');
-    if(!log) return;
+    if(!log)return;
     log.innerHTML='';
     for(const m of chatHistory){
       const d=document.createElement('div');
       d.className='msg '+(m.kind||'');
-      d.innerHTML='<strong>'+esc(m.name)+'</strong> '+esc(m.text);
+      d.innerHTML='<strong>'+esc(safe(m.name))+'</strong> '+esc(safe(m.text));
       log.appendChild(d);
     }
     log.scrollTop=log.scrollHeight;
   }
 
+  function addChat(name,text,kind=''){
+    chatHistory.push({name:safe(name),text:safe(text),kind});
+    if(chatHistory.length>100)chatHistory.shift();
+    renderChat();
+  }
+
   function updatePlayerDOM(){
-    if(!state || state.screen!=='lobby') return;
+    if(typeof state==='undefined' || state.screen!=='lobby')return;
     const box=document.getElementById('lobbyPlayers');
-    if(box) box.innerHTML=state.players.map(playerHTML).join('');
+    if(box)box.innerHTML=state.players.map(playerHTML).join('');
     const count=document.querySelector('.lobby-players h3 .muted');
-    if(count) count.textContent=`${state.players.length}/${state.settings.players}`;
+    if(count)count.textContent=`${state.players.length}/${state.settings.players}`;
     const small=document.querySelector('.room-code small');
-    if(small) small.textContent=`${state.players.length}/${state.settings.players} players • no minimum`;
+    if(small)small.textContent=`${state.players.length}/${state.settings.players} players • no minimum`;
   }
 
   async function syncPlayers(showJoin=true){
     const c=roomCode();
-    if(!c) return;
+    if(!c)return;
+
     const {data,error}=await db.from('room_players')
       .select('player_id,player_name,joined_at')
       .eq('room_code',c)
       .order('joined_at',{ascending:true});
-    if(error){console.warn('[Drawzy] player sync failed:',error);return;}
+
+    if(error){
+      console.warn('[Drawzy] player sync failed:',error);
+      return;
+    }
 
     const rows=data||[];
-    const nextIds=new Set(rows.map(r=>r.player_id));
+    const nextIds=new Set(rows.map(r=>String(r.player_id)));
+
     if(showJoin && knownPlayerIds.size){
       for(const r of rows){
-        if(!knownPlayerIds.has(r.player_id) && r.player_id!==getId()){
-          appendChat('SYSTEM',`${r.player_name} joined the room!`,'system');
+        const id=String(r.player_id);
+        if(!knownPlayerIds.has(id) && id!==String(getId())){
+          addChat('SYSTEM',`${r.player_name} joined the room!`,'system');
         }
       }
     }
+
     knownPlayerIds=nextIds;
 
+    const hostName=state.room?.host||'';
     state.players=rows.map(r=>({
       name:r.player_name,
       avatar:avatars[Math.floor(Math.random()*avatars.length)],
-      score:0,correct:false,
-      host:!!(state.room && state.room.hostPlayerId && r.player_id===state.room.hostPlayerId),
+      score:0,
+      correct:false,
+      host:String(r.player_name)===String(hostName) || !!(state.room.hostPlayerId && String(r.player_id)===String(state.room.hostPlayerId)),
       id:r.player_id
     }));
+
     updatePlayerDOM();
   }
 
+  function waitForSubscription(){
+    return channelReady || Promise.resolve(false);
+  }
+
   async function subscribeRoom(c){
-    if(!c) return;
-    if(channel && currentCode===c) return;
-    if(channel){try{await db.removeChannel(channel);}catch(e){}}
+    if(!c)return false;
+    if(channel && currentCode===c){
+      return await waitForSubscription();
+    }
+
+    if(channel){
+      try{await db.removeChannel(channel)}catch(e){}
+      channel=null;
+      currentCode=null;
+    }
+
+    let resolveReady;
+    channelReady=new Promise(resolve=>{resolveReady=resolve});
+
     channel=db.channel('drawzy-room-live-'+c,{
-      config:{broadcast:{ack:true},presence:{key:getId()}}
-    });
-
-    channel.on('broadcast',{event:'chat-message'},payload=>{
-      const p=payload && payload.payload;
-      if(!p || p.room_code!==c || p.player_id===getId()) return;
-      appendChat(p.player_name||'Player',': '+(p.text||''));
-    });
-
-    channel.on('presence',{event:'sync'},()=>{
-      // Presence is only an instant signal; the database remains the source of truth.
-      syncPlayers(true);
-    });
-    channel.on('presence',{event:'join'},()=>syncPlayers(true));
-    channel.on('presence',{event:'leave'},()=>syncPlayers(false));
-
-    currentCode=c;
-    channel.subscribe(async status=>{
-      if(status==='SUBSCRIBED'){
-        try{
-          await channel.track({player_id:getId(),player_name:state.name||'Player'});
-        }catch(e){console.warn('[Drawzy] presence track failed:',e);}
-        await syncPlayers(false);
-      }else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
-        console.warn('[Drawzy] room channel status:',status);
+      config:{
+        broadcast:{ack:true,self:false},
+        presence:{key:getId()}
       }
     });
+
+    channel
+      .on('broadcast',{event:'chat-message'},payload=>{
+        const p=payload?.payload;
+        if(!p || String(p.room_code)!==String(c))return;
+        if(String(p.player_id)===String(getId()))return;
+        addChat(p.player_name||'Player',': '+(p.text||''));
+      })
+      .on('broadcast',{event:'player-joined'},payload=>{
+        const p=payload?.payload;
+        if(!p || String(p.room_code)!==String(c))return;
+        syncPlayers(true);
+      })
+      .on('broadcast',{event:'player-left'},payload=>{
+        const p=payload?.payload;
+        if(!p || String(p.room_code)!==String(c))return;
+        syncPlayers(false);
+      })
+      .on('presence',{event:'sync'},()=>syncPlayers(true))
+      .on('presence',{event:'join'},()=>syncPlayers(true))
+      .on('presence',{event:'leave'},()=>syncPlayers(false))
+      .on('postgres_changes',{
+        event:'*',
+        schema:'public',
+        table:'room_players',
+        filter:'room_code=eq.'+c
+      },()=>syncPlayers(true));
+
+    currentCode=c;
+
+    return await new Promise(resolve=>{
+      channel.subscribe(async status=>{
+        if(status==='SUBSCRIBED'){
+          try{
+            await channel.track({
+              player_id:getId(),
+              player_name:state.name||'Player'
+            });
+          }catch(e){
+            console.warn('[Drawzy] presence track failed:',e);
+          }
+          resolveReady(true);
+          resolve(true);
+          syncPlayers(false);
+        }else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
+          console.warn('[Drawzy] room channel status:',status);
+          resolveReady(false);
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  async function announceJoin(c){
+    const ready=await subscribeRoom(c);
+    if(!ready || !channel)return false;
+    try{
+      const result=await channel.send({
+        type:'broadcast',
+        event:'player-joined',
+        payload:{room_code:c,player_id:getId(),player_name:state.name||'Player'}
+      });
+      if(result && result!=='ok')console.warn('[Drawzy] join broadcast result:',result);
+    }catch(e){
+      console.warn('[Drawzy] join broadcast failed:',e);
+    }
+    return true;
   }
 
   async function saveRoom(){
     const r=state.room;
-    if(!r || !r.code) return false;
+    if(!r?.code)return false;
+
     const {error}=await db.from('rooms').upsert({
       room_code:r.code,
       host_name:r.host||state.name||'Host',
       updated_at:new Date().toISOString()
     },{onConflict:'room_code'});
-    if(error){console.warn('[Drawzy] room save failed:',error);return false;}
+
+    if(error){
+      console.warn('[Drawzy] room save failed:',error);
+      return false;
+    }
     return true;
   }
 
   async function join(c,name){
-    if(!c || !name) return false;
+    if(!c || !name)return false;
+
     const {data:room,error:roomErr}=await db.from('rooms')
       .select('room_code,host_name')
       .eq('room_code',c)
       .maybeSingle();
+
     if(roomErr || !room){
       console.warn('[Drawzy] room lookup failed:',roomErr);
       toast('Room not found or expired');
       return false;
     }
+
     const player_id=getId();
     const {error}=await db.from('room_players').upsert({
-      room_code:c,player_id,player_name:name,joined_at:new Date().toISOString()
+      room_code:c,
+      player_id,
+      player_name:name,
+      joined_at:new Date().toISOString()
     },{onConflict:'room_code,player_id'});
+
     if(error){
       console.warn('[Drawzy] player join failed:',error);
       toast('Could not join room');
       return false;
     }
-    state.room={code:c,host:room.host_name||'Host',public:false,hostPlayerId:null};
+
+    state.room={
+      code:c,
+      host:room.host_name||'Host',
+      public:false,
+      hostPlayerId:null
+    };
     state.role='guest';
-    await subscribeRoom(c);
+    knownPlayerIds=new Set();
+
+    const ready=await subscribeRoom(c);
+    if(!ready){
+      toast('Realtime connection failed — please refresh');
+      return false;
+    }
+
     await syncPlayers(false);
+    await announceJoin(c);
     return true;
   }
 
   async function host(){
     const r=state.room;
-    if(!r || !r.code) return false;
-    if(!(await saveRoom())) return false;
+    if(!r?.code)return false;
+    if(!(await saveRoom()))return false;
+
     const pid=getId();
     const {error}=await db.from('room_players').upsert({
-      room_code:r.code,player_id:pid,player_name:state.name||'Host',joined_at:new Date().toISOString()
+      room_code:r.code,
+      player_id:pid,
+      player_name:state.name||'Host',
+      joined_at:new Date().toISOString()
     },{onConflict:'room_code,player_id'});
-    if(error){console.warn('[Drawzy] host player save failed:',error);return false;}
+
+    if(error){
+      console.warn('[Drawzy] host player save failed:',error);
+      return false;
+    }
+
     state.room.hostPlayerId=pid;
-    await subscribeRoom(r.code);
+    knownPlayerIds=new Set();
+
+    const ready=await subscribeRoom(r.code);
+    if(!ready){
+      console.warn('[Drawzy] host realtime subscription failed');
+      return false;
+    }
+
     await syncPlayers(false);
     return true;
   }
 
   async function sendChat(text){
-    const c=roomCode(), t=String(text||'').trim();
-    if(!c || !t) return false;
-    await subscribeRoom(c);
-    // Sender is rendered locally by the existing UI handler.
-    if(channel){
-      const result=await channel.send({type:'broadcast',event:'chat-message',payload:{
-        room_code:c,player_id:getId(),player_name:state.name||'Player',text:t
-      }});
-      if(result && result !== 'ok' && result.error) console.warn('[Drawzy] chat send failed:',result.error);
+    const c=roomCode();
+    const t=String(text||'').trim();
+    if(!c || !t)return false;
+
+    const ready=await subscribeRoom(c);
+    if(!ready || !channel)return false;
+
+    try{
+      const result=await channel.send({
+        type:'broadcast',
+        event:'chat-message',
+        payload:{
+          room_code:c,
+          player_id:getId(),
+          player_name:state.name||'Player',
+          text:t
+        }
+      });
+      if(result && result!=='ok'){
+        console.warn('[Drawzy] chat broadcast result:',result);
+        return false;
+      }
+      return true;
+    }catch(e){
+      console.warn('[Drawzy] chat send failed:',e);
+      return false;
     }
-    return true;
   }
 
   function bindLobbyChat(){
-    const desktop=document.getElementById('lobbyChatForm');
-    const mobile=document.getElementById('mobileLobbyChatForm');
-    const bind=(form,inputId)=>{
-      if(!form) return;
-      form.onsubmit=async e=>{
+    const forms=[
+      ['lobbyChatForm','lobbyMsg',false],
+      ['mobileLobbyChatForm','mobileLobbyMsg',true]
+    ];
+
+    for(const [formId,inputId,keepFocus] of forms){
+      const form=document.getElementById(formId);
+      if(!form || form.dataset.realtimeBound==='1')continue;
+
+      form.dataset.realtimeBound='1';
+      form.onsubmit=async function(e){
         e.preventDefault();
+        e.stopPropagation();
+
         const input=document.getElementById(inputId);
-        const v=input ? input.value.trim() : '';
-        if(!v) return;
-        const log=document.getElementById('lobbyChat');
-        if(log){
-          const d=document.createElement('div');
-          d.className='msg';
-          d.innerHTML='<strong>'+esc(state.name||'Player')+'</strong> '+esc(': '+v);
-          log.appendChild(d);log.scrollTop=log.scrollHeight;
-        }
-        chatHistory.push({name:state.name||'Player',text:': '+v,kind:''});
-        if(chatHistory.length>100) chatHistory.shift();
+        const v=input?.value.trim();
+        if(!v)return;
+
+        addChat(state.name||'Player',': '+v);
         input.value='';
-        if(inputId==='mobileLobbyMsg') input.focus();
-        await sendChat(v);
+        if(keepFocus)input.focus();
+
+        const ok=await sendChat(v);
+        if(!ok)console.warn('[Drawzy] message could not be delivered');
       };
-    };
-    bind(desktop,'lobbyMsg');
-    bind(mobile,'mobileLobbyMsg');
+    }
   }
 
   function patchRenderLobby(){
-    if(typeof renderLobby!=='function' || renderLobby.__drawzyRealtimePatched) return;
+    if(typeof renderLobby!=='function' || renderLobby.__drawzyRealtimePatched)return;
+
     const original=renderLobby;
     const wrapped=function(){
       const result=original.apply(this,arguments);
-      bindLobbyChat();
-      redrawChat();
-      const c=roomCode();
-      if(c) subscribeRoom(c);
+      setTimeout(()=>{
+        bindLobbyChat();
+        renderChat();
+        const c=roomCode();
+        if(c)subscribeRoom(c);
+      },0);
       return result;
     };
+
     wrapped.__drawzyRealtimePatched=true;
     renderLobby=wrapped;
   }
 
   patchRenderLobby();
-  window.DrawzySharedRoom={ready:true,host,join,loadPlayers:syncPlayers};
-  window.DrawzyRealtime={connect:subscribeRoom,loadPlayers:syncPlayers,sendChat,stop:async()=>{
-    if(pollId)clearInterval(pollId);
-    if(channel){try{await db.removeChannel(channel);}catch(e){}}
-    channel=null;currentCode=null;
-  }};
 
-  // Keep the roster reliable even if Realtime/Postgres notifications are delayed.
+  window.DrawzySharedRoom={
+    ready:true,
+    host,
+    join,
+    loadPlayers:syncPlayers
+  };
+
+  window.DrawzyRealtime={
+    connect:subscribeRoom,
+    loadPlayers:syncPlayers,
+    sendChat,
+    stop:async()=>{
+      if(pollId)clearInterval(pollId);
+      pollId=null;
+      if(channel){
+        try{await db.removeChannel(channel)}catch(e){}
+      }
+      channel=null;
+      currentCode=null;
+      channelReady=null;
+    }
+  };
+
+  // The database roster is the source of truth. This also covers a desktop
+  // browser that missed a realtime notification.
   pollId=setInterval(()=>{
     const c=roomCode();
-    if(c){subscribeRoom(c);syncPlayers(true);}
-  },1500);
+    if(c){
+      subscribeRoom(c);
+      syncPlayers(true);
+      bindLobbyChat();
+    }
+  },1000);
+
+  // If the page opens directly inside a room, connect immediately.
+  const initial=roomCode();
+  if(initial)subscribeRoom(initial);
+
+  // Initial bind after the first DOM render.
+  setTimeout(bindLobbyChat,0);
 })();
 </script>
 
