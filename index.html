@@ -1333,52 +1333,30 @@ function addLobbyMessageIfVisible(text){
 function createRoomDirect(){
  state.settings={players:8,drawTime:80,rounds:3,hints:2,mode:'Classic',wordCount:3,difficulty:'medium',customWords:'',wordSource:'random',publicMinPlayers:0};
  state.room={code:makeCode(),host:state.name,public:false};state.role='host';state.players=[];joinPlayer(state.name,true);
- state.screen='lobby';render();toast('Room created — set the rules below');
+ state.screen='lobby';render();if(window.DrawzySharedRoom&&DrawzySharedRoom.ready) DrawzySharedRoom.host();toast('Room created — set the rules below');
 }
 function renderCreate(){ createRoomDirect(); }
 
 function makeCode(){return Math.random().toString(36).slice(2,7).toUpperCase()}
 function joinPlayer(name,host=false){if(!state.players.find(p=>p.name===name))state.players.push({name,avatar:avatars[Math.floor(Math.random()*avatars.length)],score:0,correct:false,host})}
-function renderJoin(){
-  document.body.classList.remove('game-active');
-  const code=state.pendingRoomCode||roomFromUrl()||'';
-  app.innerHTML=`<div class="card" style="max-width:500px;margin:auto;padding:24px">
-    <div class="kicker">DRAWZY ROOM</div>
-    <h1 style="font-size:32px;margin:5px 0">You've been invited</h1>
-    <p class="muted">Room <b>${esc(code)}</b> is ready. Choose what you want to do.</p>
-    <div class="actions" style="margin-top:22px">
-      <button class="btn ghost wide" id="homeFromInvite">⌂ HOME</button>
-      <button class="btn primary wide" id="showJoin">▶ JOIN ROOM</button>
-    </div>
-    <div id="joinPanel" style="display:none;margin-top:18px">
-      <div class="field"><label>NAME</label><input class="input" id="joinName" maxlength="20" value="${esc(state.name)}" placeholder="Enter your name"></div>
-      <button class="btn primary wide" id="confirmJoin">▶ JOIN ROOM</button>
-    </div>
-  </div>`;
-  $('#homeFromInvite').onclick=()=>{
-    state.pendingRoomCode=null;
-    history.replaceState(null,'',location.pathname+location.search.replace(/([?&])room=[^&]*/,'').replace(/[?&]$/,''));
-    state.screen='home';
-    render();
-  };
-  $('#showJoin').onclick=()=>{
-    $('#joinPanel').style.display='block';
-    $('#showJoin').style.display='none';
-    $('#joinName').focus();
-  };
-  $('#confirmJoin').onclick=()=>{
-    const name=($('#joinName').value||'').trim();
-    if(!name){toast('Enter your name');return}
-    saveName(name);
-    state.room={code:code||'PUBLIC-'+makeCode(),host:'Room host',public:false};
-    state.role='guest';
-    state.players=[];
-    joinPlayer(state.name,false);
-    state.screen='lobby';
-    render();
-    broadcastRoom();
-  };
+function renderJoin(){document.body.classList.remove('game-active');
+ const code=new URLSearchParams(location.search).get('room')||roomFromUrl()||'';
+ app.innerHTML=`<div class="card" style="max-width:500px;margin:auto;padding:24px"><div class="kicker">DRAWZY ROOM</div><h1 style="font-size:32px;margin:5px 0">You've been invited</h1><p class="muted">Room <b>${esc(code)}</b> is ready.</p><div class="actions" style="margin-top:22px"><button class="btn ghost wide" id="inviteHome">⌂ HOME</button><button class="btn primary wide" id="inviteJoin">▶ JOIN ROOM</button></div><div id="inviteNamePanel" style="display:none;margin-top:18px"><div class="field"><label>NAME</label><input class="input" id="joinName" maxlength="20" value="${esc(state.name)}" placeholder="Enter your name"></div><button class="btn primary wide" id="confirmInviteJoin">▶ JOIN ROOM</button></div></div>`;
+ $('#inviteHome').onclick=home;
+ $('#inviteJoin').onclick=()=>{ $('#inviteNamePanel').style.display='block'; $('#inviteJoin').style.display='none'; $('#joinName').focus(); };
+ $('#confirmInviteJoin').onclick=async()=>{
+   const name=$('#joinName').value.trim(); if(!name){toast('Enter your name');return;}
+   saveName(name);
+   const joinCode=code||'';
+   if(!joinCode){toast('Invalid room link');return;}
+   if(window.DrawzySharedRoom&&DrawzySharedRoom.ready){
+     const ok=await DrawzySharedRoom.join(joinCode,state.name);
+     if(!ok)return;
+   } else { toast('Room service is not configured'); return; }
+   state.role='guest'; state.screen='lobby'; render();
+ };
 }
+
 function renderLobby(){document.body.classList.remove('game-active');
  const s=state.settings, isPublic=!!state.room.public;
  const inviteUrl=buildInviteUrl(state.room.code);
@@ -1665,7 +1643,11 @@ function profile(){
 
 const profileBtn=$('#profileBtn'),profileAvatar=$('#profileAvatar');if(profileAvatar)profileAvatar.textContent=state.avatar;if(profileBtn)profileBtn.onclick=profile;if(profileAvatar)profileAvatar.onclick=profile;
 function broadcastRoom(){try{const bc=new BroadcastChannel('drawzy-room');bc.postMessage({type:'room',room:state.room,players:state.players,settings:state.settings})}catch{}}
-function initFromURL(){  const code=roomFromUrl();  if(code){    state.pendingRoomCode=code;    state.screen='join';    render();  } else render(); }
+function initFromURL(){
+ const code=roomFromUrl();
+ if(code){ state.pendingRoomCode=code; state.screen='join'; render(); }
+ else render();
+}
 initFromURL();
 /* DRAWZY multiplayer foundation
    - Same-browser tabs/windows can sync through BroadcastChannel.
@@ -2137,85 +2119,80 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 </script>
 
 
-<script id="cross-device-room-invite-fix">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script id="drawzy-supabase-config">
 (function(){
-  /*
-   * Cross-device invite bridge.
-   * The existing page can continue to work locally; when the project exposes
-   * the Supabase client, room metadata is also written/read from a small
-   * `rooms` table. This does not alter drawing/UI code.
-   */
-  if(typeof window.supabase === 'undefined' || !window.supabase) return;
-
-  var client=window.supabase;
-  var roomCode=null;
-
-  function getRoomCode(){
-    try{
-      var p=new URLSearchParams(location.search);
-      return p.get('room') || p.get('roomCode') || null;
-    }catch(e){ return null; }
+  const SUPABASE_URL = 'https://wnjsajfahsqunfesmetu.supabase.co';
+  // Paste your Supabase PUBLISHABLE key between the quotes below.
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_S_ePD9oEegH0R0XR8LGvjQ_sMs9OZSm';
+  if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_PUBLISHABLE_KEY !== 'PASTE_YOUR_PUBLISHABLE_KEY_HERE') {
+    window.drawzySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   }
-
-  function makeCode(){
-    return Math.random().toString(36).slice(2,8).toUpperCase();
-  }
-
-  async function ensureRoom(){
-    roomCode=getRoomCode();
-    if(!roomCode) return;
-
-    try{
-      var result=await client.from('rooms').select('*').eq('room_code',roomCode).maybeSingle();
-      if(result && result.data){
-        window.dispatchEvent(new CustomEvent('drawzy:remote-room',{
-          detail:result.data
-        }));
-      }
-    }catch(e){
-      console.warn('Drawzy room lookup unavailable:',e);
-    }
-  }
-
-  window.DrawzyInvite={
-    getRoomCode:getRoomCode,
-    createRoom:async function(data){
-      var code=(data && data.room_code) || getRoomCode() || makeCode();
-      try{
-        var payload=Object.assign({},data||{},{
-          room_code:code,
-          updated_at:new Date().toISOString()
-        });
-        var result=await client.from('rooms').upsert(payload,{onConflict:'room_code'}).select().single();
-        if(result && result.data){
-          roomCode=code;
-          return result.data;
-        }
-      }catch(e){
-        console.warn('Drawzy room create/update failed:',e);
-      }
-      return null;
-    },
-    joinRoom:async function(code){
-      try{
-        var result=await client.from('rooms').select('*').eq('room_code',code).maybeSingle();
-        if(result && result.data){
-          window.dispatchEvent(new CustomEvent('drawzy:remote-room',{
-            detail:result.data
-          }));
-          return result.data;
-        }
-      }catch(e){
-        console.warn('Drawzy room join failed:',e);
-      }
-      return null;
-    }
-  };
-
-  ensureRoom();
 })();
 </script>
 
+<script id="cross-device-room-invite-fix">
+(function(){
+  const db = window.drawzySupabase;
+  if(!db) {
+    console.warn('[Drawzy] Supabase is not initialized. Add the publishable key in drawzy-supabase-config.');
+    return;
+  }
+  let channel = null;
+  const idKey='drawzy_player_id';
+  function getId(){
+    let id=localStorage.getItem(idKey);
+    if(!id){ id=(crypto.randomUUID?crypto.randomUUID():'p_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2)); localStorage.setItem(idKey,id); }
+    return id;
+  }
+  function code(){ return window.state && state.room ? state.room.code : roomFromUrl(); }
+  async function createOrUpdateRoom(){
+    const r=state.room; if(!r || !r.code) return;
+    const {error}=await db.from('rooms').upsert({room_code:r.code,host_name:r.host||state.name||'Host',updated_at:new Date().toISOString()},{onConflict:'room_code'});
+    if(error) console.warn('[Drawzy] room save failed:',error);
+  }
+  async function loadPlayers(){
+    const c=code(); if(!c) return;
+    const {data,error}=await db.from('room_players').select('player_id,player_name,joined_at').eq('room_code',c).order('joined_at',{ascending:true});
+    if(error){ console.warn('[Drawzy] player load failed:',error); return; }
+    state.players=(data||[]).map(x=>({name:x.player_name,avatar:avatars[Math.floor(Math.random()*avatars.length)],score:0,correct:false,host:x.player_id===state.room.hostPlayerId,id:x.player_id}));
+    if(typeof render==='function' && state.screen==='lobby') render();
+  }
+  async function join(c,name){
+    if(!c || !name) return false;
+    const {data:room,error:roomErr}=await db.from('rooms').select('room_code,host_name').eq('room_code',c).maybeSingle();
+    if(roomErr || !room){ console.warn('[Drawzy] room not found',roomErr); toast('Room not found or expired'); return false; }
+    const player_id=getId();
+    const {error}=await db.from('room_players').upsert({room_code:c,player_id,player_name:name,joined_at:new Date().toISOString()},{onConflict:'room_code,player_id'});
+    if(error){ console.warn('[Drawzy] join failed:',error); toast('Could not join room'); return false; }
+    state.room={code:c,host:room.host_name||'Host',public:false,hostPlayerId:state.room&&state.room.hostPlayerId};
+    if(channel) { try{ await db.removeChannel(channel); }catch(e){} }
+    channel=db.channel('drawzy-room-'+c)
+      .on('postgres_changes',{event:'*',schema:'public',table:'room_players',filter:'room_code=eq.'+c},()=>loadPlayers())
+      .on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'room_code=eq.'+c},()=>loadPlayers())
+      .subscribe();
+    await loadPlayers();
+    return true;
+  }
+  async function host(){
+    await createOrUpdateRoom();
+    const c=state.room.code, pid=getId();
+    await db.from('room_players').upsert({room_code:c,player_id:pid,player_name:state.name||'Host',joined_at:new Date().toISOString()},{onConflict:'room_code,player_id'});
+    state.room.hostPlayerId=pid;
+    if(channel) { try{ await db.removeChannel(channel); }catch(e){} }
+    channel=db.channel('drawzy-room-'+c)
+      .on('postgres_changes',{event:'*',schema:'public',table:'room_players',filter:'room_code=eq.'+c},()=>loadPlayers())
+      .subscribe();
+    await loadPlayers();
+  }
+  window.DrawzySharedRoom={ready:true,host,join,loadPlayers};
+})();
+</script>
+
+
+<script id="drawzy-config-warning">
+window.addEventListener('load',function(){if(!window.drawzySupabase){console.warn('Drawzy: paste the Supabase publishable key into drawzy-supabase-config before testing room links.')}});
+</script>
 </body>
 </html>
 
