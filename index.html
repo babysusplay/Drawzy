@@ -1121,6 +1121,25 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
   }
 }
 </style>
+
+<style id="mobile-players-roomchat-actual-extension-v14">
+@media screen and (max-width:650px) and (orientation:portrait){
+  /* ONLY mobile lobby Players + Room Chat: extend into the unused space above chat input. */
+  body:not(.game-active) .lobby-shell .lobby-grid{
+    grid-template-rows:auto minmax(0,1fr)!important;
+    overflow:visible!important;
+  }
+  body:not(.game-active) .lobby-shell .lobby-players,
+  body:not(.game-active) .lobby-shell .lobby-chat{
+    height:calc(100% + 44px)!important;
+    min-height:0!important;
+    max-height:none!important;
+    align-self:start!important;
+    box-sizing:border-box!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
