@@ -1339,13 +1339,46 @@ function renderCreate(){ createRoomDirect(); }
 
 function makeCode(){return Math.random().toString(36).slice(2,7).toUpperCase()}
 function joinPlayer(name,host=false){if(!state.players.find(p=>p.name===name))state.players.push({name,avatar:avatars[Math.floor(Math.random()*avatars.length)],score:0,correct:false,host})}
-function renderJoin(){document.body.classList.remove('game-active');
- const code=new URLSearchParams(location.search).get('room')||roomFromUrl()||'';
- app.innerHTML=`<div class="card" style="max-width:500px;margin:auto;padding:24px"><button class="btn ghost" id="back">← Back</button><div style="margin:16px 0"><div class="kicker">JOIN ROOM</div><h1 style="font-size:32px;margin:5px 0">Choose your name</h1><p class="muted">No account needed.</p></div><div class="field"><label>NAME</label><input class="input" id="joinName" maxlength="20" value="${esc(state.name)}" placeholder="Enter your name"></div><button class="btn primary wide" id="join">▶ JOIN ROOM</button></div>`;
- $('#back').onclick=home;
- $('#join').onclick=()=>{saveName($('#joinName').value);state.room={code:code||'PUBLIC-'+makeCode(),host:'Room host',public:!code};state.role='guest';state.players=[];joinPlayer(state.name,false);state.screen='lobby';render();broadcastRoom();};
+function renderJoin(){
+  document.body.classList.remove('game-active');
+  const code=state.pendingRoomCode||roomFromUrl()||'';
+  app.innerHTML=`<div class="card" style="max-width:500px;margin:auto;padding:24px">
+    <div class="kicker">DRAWZY ROOM</div>
+    <h1 style="font-size:32px;margin:5px 0">You've been invited</h1>
+    <p class="muted">Room <b>${esc(code)}</b> is ready. Choose what you want to do.</p>
+    <div class="actions" style="margin-top:22px">
+      <button class="btn ghost wide" id="homeFromInvite">⌂ HOME</button>
+      <button class="btn primary wide" id="showJoin">▶ JOIN ROOM</button>
+    </div>
+    <div id="joinPanel" style="display:none;margin-top:18px">
+      <div class="field"><label>NAME</label><input class="input" id="joinName" maxlength="20" value="${esc(state.name)}" placeholder="Enter your name"></div>
+      <button class="btn primary wide" id="confirmJoin">▶ JOIN ROOM</button>
+    </div>
+  </div>`;
+  $('#homeFromInvite').onclick=()=>{
+    state.pendingRoomCode=null;
+    history.replaceState(null,'',location.pathname+location.search.replace(/([?&])room=[^&]*/,'').replace(/[?&]$/,''));
+    state.screen='home';
+    render();
+  };
+  $('#showJoin').onclick=()=>{
+    $('#joinPanel').style.display='block';
+    $('#showJoin').style.display='none';
+    $('#joinName').focus();
+  };
+  $('#confirmJoin').onclick=()=>{
+    const name=($('#joinName').value||'').trim();
+    if(!name){toast('Enter your name');return}
+    saveName(name);
+    state.room={code:code||'PUBLIC-'+makeCode(),host:'Room host',public:false};
+    state.role='guest';
+    state.players=[];
+    joinPlayer(state.name,false);
+    state.screen='lobby';
+    render();
+    broadcastRoom();
+  };
 }
-
 function renderLobby(){document.body.classList.remove('game-active');
  const s=state.settings, isPublic=!!state.room.public;
  const inviteUrl=buildInviteUrl(state.room.code);
@@ -1632,11 +1665,7 @@ function profile(){
 
 const profileBtn=$('#profileBtn'),profileAvatar=$('#profileAvatar');if(profileAvatar)profileAvatar.textContent=state.avatar;if(profileBtn)profileBtn.onclick=profile;if(profileAvatar)profileAvatar.onclick=profile;
 function broadcastRoom(){try{const bc=new BroadcastChannel('drawzy-room');bc.postMessage({type:'room',room:state.room,players:state.players,settings:state.settings})}catch{}}
-function initFromURL(){
- const code=new URLSearchParams(location.search).get('room');if(code&&!state.name){needName(()=>{state.room={code,host:'Room host',public:false};state.role='guest';joinPlayer(state.name);state.screen='lobby';render()})}
- else if(code){state.room={code,host:'Room host',public:false};state.role='guest';joinPlayer(state.name);state.screen='lobby';render()}
- else render();
-}
+function initFromURL(){  const code=roomFromUrl();  if(code){    state.pendingRoomCode=code;    state.screen='join';    render();  } else render(); }
 initFromURL();
 /* DRAWZY multiplayer foundation
    - Same-browser tabs/windows can sync through BroadcastChannel.
