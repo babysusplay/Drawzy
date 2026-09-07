@@ -1997,6 +1997,111 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 })();
 </script>
 
+
+<style id="mobile-chat-keyboard-clean-v18">
+@media screen and (max-width:650px) and (orientation:portrait){
+  html.chat-keyboard-open,
+  body.chat-keyboard-open{
+    overflow:hidden!important;
+  }
+
+  body.chat-keyboard-open{
+    /* Keep the document itself in its normal layout; do not translate/fix the page. */
+    transform:none!important;
+  }
+
+  body.chat-keyboard-open #mobileLobbyChatForm{
+    position:fixed!important;
+    left:4px!important;
+    right:4px!important;
+    bottom:calc(var(--chat-kb-height, 0px) + 4px)!important;
+    width:auto!important;
+    z-index:99999!important;
+  }
+}
+</style>
+
+<script id="mobile-chat-keyboard-clean-v18">
+(function(){
+  if(!window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
+
+  function init(){
+    var input = document.getElementById('mobileLobbyMsg');
+    var form  = document.getElementById('mobileLobbyChatForm');
+    if(!input || !form) return;
+
+    var active = false;
+    var normalScroll = 0;
+
+    function viewportKeyboardHeight(){
+      var vv = window.visualViewport;
+      if(!vv) return 0;
+      return Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    }
+
+    function apply(){
+      if(!active) return;
+      var h = viewportKeyboardHeight();
+      document.documentElement.style.setProperty('--chat-kb-height', h + 'px');
+      document.body.classList.add('chat-keyboard-open');
+      document.documentElement.classList.add('chat-keyboard-open');
+    }
+
+    function openChat(){
+      if(!active){
+        normalScroll = window.scrollY || 0;
+        active = true;
+      }
+      apply();
+      /* Do not call scrollIntoView, focus-scroll, body-fixed, or translate the page. */
+      setTimeout(apply, 50);
+      setTimeout(apply, 200);
+      setTimeout(apply, 500);
+    }
+
+    function closeChat(){
+      active = false;
+      document.body.classList.remove('chat-keyboard-open');
+      document.documentElement.classList.remove('chat-keyboard-open');
+      document.documentElement.style.removeProperty('--chat-kb-height');
+      /* Restore only if the browser itself changed document scroll. */
+      if(Math.abs((window.scrollY || 0) - normalScroll) > 2){
+        window.scrollTo(0, normalScroll);
+      }
+    }
+
+    input.addEventListener('focus', openChat);
+    input.addEventListener('click', openChat);
+
+    input.addEventListener('blur', function(){
+      setTimeout(function(){
+        if(viewportKeyboardHeight() < 60) closeChat();
+      }, 180);
+    });
+
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', function(){
+        if(viewportKeyboardHeight() >= 60) apply();
+        else if(active) closeChat();
+      }, {passive:true});
+
+      window.visualViewport.addEventListener('scroll', function(){
+        if(active) apply();
+      }, {passive:true});
+    }
+
+    form.addEventListener('submit', function(){
+      setTimeout(function(){
+        if(viewportKeyboardHeight() < 60) closeChat();
+      }, 180);
+    });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
 </body>
 </html>
 
