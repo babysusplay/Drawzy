@@ -1140,6 +1140,17 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
+
+<style id="mobile-players-roomchat-slightly-larger-v15">
+@media screen and (max-width:650px) and (orientation:portrait){
+  /* Only a small additional increase to Players + Room Chat. */
+  body:not(.game-active) .lobby-shell .lobby-players,
+  body:not(.game-active) .lobby-shell .lobby-chat{
+    height:calc(100% + 52px)!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
