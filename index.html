@@ -2124,7 +2124,7 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 (function(){
   const SUPABASE_URL = 'https://wnjsajfahsqunfesmetu.supabase.co';
   // Paste your Supabase PUBLISHABLE key between the quotes below.
-  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_S_ePD9oEegH0R0XR8LGvjQ_sMs9OZSm';
+  const SUPABASE_PUBLISHABLE_KEY = 'PASTE_YOUR_PUBLISHABLE_KEY_HERE';
   if (window.supabase && typeof window.supabase.createClient === 'function' && SUPABASE_PUBLISHABLE_KEY !== 'PASTE_YOUR_PUBLISHABLE_KEY_HERE') {
     window.drawzySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   }
@@ -2193,6 +2193,253 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 <script id="drawzy-config-warning">
 window.addEventListener('load',function(){if(!window.drawzySupabase){console.warn('Drawzy: paste the Supabase publishable key into drawzy-supabase-config before testing room links.')}});
 </script>
+
+<script id="drawzy-final-realtime-fix">
+(function(){
+  /*
+   * Final realtime layer for cross-device lobby state + chat.
+   * Uses the already configured Supabase client and leaves the existing
+   * layout/keyboard/chat UI untouched.
+   */
+  const start = () => {
+    const db = window.drawzySupabase;
+    if(!db){
+      console.warn('[Drawzy] Realtime disabled: Supabase client is not configured.');
+      return;
+    }
+
+    let channel = null;
+    let currentCode = null;
+    let playerTimer = null;
+    let lastRenderedRoom = null;
+
+    const pid = () => {
+      let id = localStorage.getItem('drawzy_player_id');
+      if(!id){
+        id = (crypto.randomUUID ? crypto.randomUUID() :
+          'p_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));
+        localStorage.setItem('drawzy_player_id', id);
+      }
+      return id;
+    };
+
+    const roomCode = () => {
+      try { return window.state && state.room && state.room.code || null; }
+      catch(e){ return null; }
+    };
+
+    const playerShape = (r) => ({
+      id:r.player_id,
+      name:r.player_name,
+      avatar: (window.avatars && avatars.length) ? avatars[Math.floor(Math.random()*avatars.length)] : '🙂',
+      score:0,
+      correct:false,
+      host: !!(state.room && state.room.hostPlayerId && r.player_id === state.room.hostPlayerId)
+    });
+
+    async function loadPlayers(code, redraw=true){
+      if(!code || !window.state) return;
+      const {data,error}=await db.from('room_players')
+        .select('player_id,player_name,joined_at')
+        .eq('room_code',code)
+        .order('joined_at',{ascending:true});
+
+      if(error){
+        console.warn('[Drawzy] realtime player sync failed:',error);
+        return;
+      }
+
+      const incoming=(data||[]).map(playerShape);
+      state.players=incoming;
+
+      if(redraw && state.screen==='lobby' && typeof render==='function'){
+        // Avoid unnecessary redraw loops while still updating immediately.
+        if(lastRenderedRoom===code){
+          render();
+        }else{
+          lastRenderedRoom=code;
+          render();
+        }
+      }
+    }
+
+    function addIncomingChat(name,text){
+      const log=document.getElementById('lobbyChat');
+      if(!log) return;
+      const d=document.createElement('div');
+      d.className='msg';
+      d.innerHTML=`<strong>${typeof esc==='function'?esc(name):name}</strong> ${typeof esc==='function'?esc(': '+text):': '+text}`;
+      log.appendChild(d);
+      log.scrollTop=log.scrollHeight;
+    }
+
+    function stop(){
+      if(playerTimer){ clearInterval(playerTimer); playerTimer=null; }
+      if(channel){
+        try{ db.removeChannel(channel); }catch(e){}
+        channel=null;
+      }
+      currentCode=null;
+    }
+
+    async function connect(code){
+      if(!code) return;
+      if(currentCode===code && channel) return;
+
+      stop();
+      currentCode=code;
+
+      channel=db.channel('drawzy-live-room-'+code, {
+        config:{ broadcast:{ack:true} }
+      });
+
+      channel
+        .on('broadcast',{event:'player-joined'}, payload=>{
+          if(payload && payload.payload) loadPlayers(code,true);
+        })
+        .on('broadcast',{event:'player-left'}, payload=>{
+          if(payload && payload.payload) loadPlayers(code,true);
+        })
+        .on('broadcast',{event:'chat-message'}, payload=>{
+          const p=payload && payload.payload;
+          if(!p || p.player_id===pid()) return;
+          if(p.room_code!==code) return;
+          addIncomingChat(p.player_name || 'Player', p.text || '');
+        })
+        .on('postgres_changes',{
+          event:'*',
+          schema:'public',
+          table:'room_players',
+          filter:'room_code=eq.'+code
+        },()=>loadPlayers(code,true))
+        .subscribe(status=>{
+          if(status==='SUBSCRIBED'){
+            loadPlayers(code,false);
+          }
+        });
+
+      // Fallback polling guarantees the host sees a newly joined player even
+      // if a Realtime subscription is delayed or dropped.
+      playerTimer=setInterval(()=>loadPlayers(code,false),1500);
+    }
+
+    async function announceJoin(code){
+      if(!channel) await connect(code);
+      if(channel){
+        try{
+          await channel.send({
+            type:'broadcast',
+            event:'player-joined',
+            payload:{room_code:code,player_id:pid()}
+          });
+        }catch(e){}
+      }
+    }
+
+    async function sendChat(text){
+      const code=roomCode();
+      if(!code || !text) return;
+      if(!channel) await connect(code);
+      if(channel){
+        try{
+          await channel.send({
+            type:'broadcast',
+            event:'chat-message',
+            payload:{
+              room_code:code,
+              player_id:pid(),
+              player_name:state.name||'Player',
+              text:text
+            }
+          });
+        }catch(e){
+          console.warn('[Drawzy] chat broadcast failed:',e);
+        }
+      }
+    }
+
+    function bindChat(){
+      const form=document.getElementById('lobbyChatForm');
+      const mobile=document.getElementById('mobileLobbyChatForm');
+
+      const bind=(f,inputId)=>{
+        if(!f || f.dataset.realtimeBound==='1') return;
+        f.dataset.realtimeBound='1';
+        f.addEventListener('submit', async e=>{
+          // Let the original handler add the sender's own message.
+          const input=document.getElementById(inputId);
+          const text=input ? input.value.trim() : '';
+          if(text) await sendChat(text);
+        }, true);
+      };
+
+      bind(form,'lobbyMsg');
+      bind(mobile,'mobileLobbyMsg');
+    }
+
+    // Patch renderLobby so every rerender reconnects to the current room and
+    // rebinds the two existing chat inputs.
+    const patchRender = () => {
+      if(typeof window.renderLobby!=='function' || window.renderLobby.__realtimePatched) return;
+      const original=window.renderLobby;
+      function wrapped(){
+        const result=original.apply(this,arguments);
+        const code=roomCode();
+        if(code) connect(code);
+        setTimeout(bindChat,0);
+        return result;
+      }
+      wrapped.__realtimePatched=true;
+      window.renderLobby=wrapped;
+    };
+
+    patchRender();
+
+    // Host/join functions are invoked after this script loads. Patch them so
+    // the database row and realtime connection are guaranteed.
+    if(typeof window.DrawzySharedRoom==='object'){
+      const oldHost=window.DrawzySharedRoom.host;
+      const oldJoin=window.DrawzySharedRoom.join;
+
+      window.DrawzySharedRoom.host=async function(){
+        const result=oldHost ? await oldHost.apply(this,arguments) : false;
+        const code=roomCode();
+        if(code){
+          await connect(code);
+          await announceJoin(code);
+          await loadPlayers(code,false);
+        }
+        return result;
+      };
+
+      window.DrawzySharedRoom.join=async function(code,name){
+        const result=oldJoin ? await oldJoin.apply(this,arguments) : false;
+        if(result){
+          await connect(code);
+          await announceJoin(code);
+          await loadPlayers(code,false);
+        }
+        return result;
+      };
+    }
+
+    // In case the page is already in a room when this script initializes.
+    const existing=roomCode();
+    if(existing) connect(existing);
+
+    window.DrawzyRealtime={
+      connect,
+      loadPlayers,
+      sendChat,
+      stop
+    };
+  };
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start);
+  else start();
+})();
+</script>
+
 </body>
 </html>
 
