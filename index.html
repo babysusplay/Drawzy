@@ -1912,7 +1912,7 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     const chat=getChat();
     if(!chat) return;
     chat.classList.add('chat-keyboard-active');
-    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()-Math.round(window.innerHeight*0.05))+'px');
+    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()+6)+'px');
   }
 
   function lockPage(){
@@ -2099,6 +2099,17 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
   else init();
 })();
 </script>
+
+
+<style id="chat-only-lower-v22">
+@media screen and (max-width:650px) and (orientation:portrait){
+  /* v18 keyboard locking stays untouched.
+     This changes only the chat bar's visual bottom position. */
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar.chat-keyboard-active{
+    bottom:calc(var(--chat-keyboard-bottom, 6px) - 18px)!important;
+  }
+}
+</style>
 
 </body>
 </html>
