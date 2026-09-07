@@ -1152,35 +1152,6 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 </style>
 
 
-<style id="mobile-chat-keyboard-real-fix-v17">
-@media screen and (max-width:650px) and (orientation:portrait){
-  html.mobile-chat-lock,
-  html.mobile-chat-lock body{
-    overflow:hidden!important;
-    overscroll-behavior:none!important;
-    touch-action:pan-x pan-y!important;
-  }
-  body.mobile-chat-lock{
-    position:fixed!important;
-    left:0!important;
-    right:0!important;
-    width:100%!important;
-  }
-  body.mobile-chat-lock .app{
-    position:relative!important;
-  }
-  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar.chat-keyboard-active{
-    position:fixed!important;
-    left:4px!important;
-    right:4px!important;
-    bottom:var(--chat-keyboard-bottom,6px)!important;
-    top:auto!important;
-    z-index:2147483000!important;
-    transform:none!important;
-  }
-}
-</style>
-
 </head>
 <body>
 <div class="app"><div class="shell">
@@ -1891,250 +1862,105 @@ function setLobbyTool(tool){state.eraser=false;state.tool=tool;state.shape='none
 document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:true});
 </script>
 
-<script id="mobile-chat-keyboard-real-fix-v17">
-(function(){
-  if(!window.matchMedia || !window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
-  let locked=false, savedY=0, savedTop='';
-  const root=document.documentElement, body=document.body;
-
-  function getChat(){return document.getElementById('mobileLobbyChatForm')}
-  function getInput(){return document.getElementById('mobileLobbyMsg')}
-
-  function keyboardInset(){
-    const vv=window.visualViewport;
-    if(!vv) return 0;
-    return Math.max(0, Math.round(window.innerHeight-(vv.height+vv.offsetTop)));
-  }
-
-  function placeChat(){
-    if(!locked) return;
-    const chat=getChat();
-    if(!chat) return;
-    chat.classList.add('chat-keyboard-active');
-    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()+6)+'px');
-  }
-
-  function lockPage(){
-    if(locked) { placeChat(); return; }
-    savedY=window.scrollY||document.documentElement.scrollTop||0;
-    savedTop=body.style.top;
-    root.classList.add('mobile-chat-lock');
-    body.classList.add('mobile-chat-lock');
-    body.style.top=(-savedY)+'px';
-    locked=true;
-    placeChat();
-    /* Chrome can perform its focus-scroll a frame after focus; restore the saved page position. */
-    requestAnimationFrame(function(){window.scrollTo(0,savedY);placeChat()});
-    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},60);
-    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},180);
-  }
-
-  function unlockPage(){
-    if(!locked) return;
-    const chat=getChat();
-    if(chat){
-      chat.classList.remove('chat-keyboard-active');
-      chat.style.removeProperty('--chat-keyboard-bottom');
-    }
-    locked=false;
-    root.classList.remove('mobile-chat-lock');
-    body.classList.remove('mobile-chat-lock');
-    body.style.top=savedTop;
-    window.scrollTo(0,savedY);
-  }
-
-  function inputTouch(e){
-    const input=getInput();
-    if(!input || e.target!==input) return;
-    /* Lock before the browser processes the focus gesture. */
-    lockPage();
-  }
-
-  document.addEventListener('touchstart',inputTouch,{capture:true,passive:true});
-  document.addEventListener('pointerdown',function(e){
-    const input=getInput();
-    if(input && e.target===input) lockPage();
-  },{capture:true,passive:true});
-
-  document.addEventListener('focusin',function(e){
-    const input=getInput();
-    if(input && e.target===input){
-      lockPage();
-      setTimeout(placeChat,0);
-      setTimeout(placeChat,100);
-      setTimeout(placeChat,300);
-    }
-  },true);
-
-  document.addEventListener('focusout',function(e){
-    const input=getInput();
-    if(input && e.target===input){
-      setTimeout(function(){
-        if(keyboardInset()<40) unlockPage();
-      },120);
-    }
-  },true);
-
-  document.addEventListener('submit',function(e){
-    if(e.target && e.target.id==='mobileLobbyChatForm'){
-      setTimeout(function(){
-        const input=getInput();
-        if(input) input.blur();
-        unlockPage();
-      },80);
-    }
-  },true);
-
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize',placeChat,{passive:true});
-    window.visualViewport.addEventListener('scroll',function(){
-      if(locked){window.scrollTo(0,savedY);placeChat()}
-    },{passive:true});
-  }
-
-  window.addEventListener('resize',function(){if(locked){window.scrollTo(0,savedY);placeChat()}},{passive:true});
-})();
-</script>
-
-
-<style id="mobile-chat-keyboard-clean-v18">
+<style id="mobile-chat-keyboard-final-v20">
 @media screen and (max-width:650px) and (orientation:portrait){
   html.chat-keyboard-open,
   body.chat-keyboard-open{
     overflow:hidden!important;
-  }
-
-  body.chat-keyboard-open{
-    /* Keep the document itself in its normal layout; do not translate/fix the page. */
-    transform:none!important;
+    overscroll-behavior:none!important;
   }
 
   body.chat-keyboard-open #mobileLobbyChatForm{
     position:fixed!important;
     left:4px!important;
     right:4px!important;
-    bottom:calc(var(--chat-kb-height, 0px) + 4px)!important;
     width:auto!important;
     z-index:99999!important;
+    /* Put the chat bar at the keyboard edge, not one full bar-height above it. */
+    bottom:max(4px, calc(var(--chat-kb-height, 0px) - 46px))!important;
+    transform:none!important;
   }
 }
 </style>
 
-<script id="mobile-chat-keyboard-clean-v18">
+<script id="mobile-chat-keyboard-final-v20">
 (function(){
   if(!window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
   function init(){
-    var input = document.getElementById('mobileLobbyMsg');
-    var form  = document.getElementById('mobileLobbyChatForm');
+    var input=document.getElementById('mobileLobbyMsg');
+    var form=document.getElementById('mobileLobbyChatForm');
     if(!input || !form) return;
 
-    var active = false;
-    var normalScroll = 0;
+    var active=false;
+    var normalScroll=0;
 
-    function viewportKeyboardHeight(){
-      var vv = window.visualViewport;
+    function kbHeight(){
+      var vv=window.visualViewport;
       if(!vv) return 0;
-      return Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      return Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop));
     }
 
-    function apply(){
+    function place(){
       if(!active) return;
-      var h = viewportKeyboardHeight();
-      document.documentElement.style.setProperty('--chat-kb-height', h + 'px');
-      document.body.classList.add('chat-keyboard-open');
+      document.documentElement.style.setProperty('--chat-kb-height',kbHeight()+'px');
       document.documentElement.classList.add('chat-keyboard-open');
+      document.body.classList.add('chat-keyboard-open');
     }
 
-    function openChat(){
+    function open(){
       if(!active){
-        normalScroll = window.scrollY || 0;
-        active = true;
+        normalScroll=window.scrollY||0;
+        active=true;
       }
-      apply();
-      /* Do not call scrollIntoView, focus-scroll, body-fixed, or translate the page. */
-      setTimeout(apply, 50);
-      setTimeout(apply, 200);
-      setTimeout(apply, 500);
+      place();
+      setTimeout(place,50);
+      setTimeout(place,150);
+      setTimeout(place,300);
     }
 
-    function closeChat(){
-      active = false;
-      document.body.classList.remove('chat-keyboard-open');
+    function close(){
+      if(!active) return;
+      active=false;
       document.documentElement.classList.remove('chat-keyboard-open');
+      document.body.classList.remove('chat-keyboard-open');
       document.documentElement.style.removeProperty('--chat-kb-height');
-      /* Restore only if the browser itself changed document scroll. */
-      if(Math.abs((window.scrollY || 0) - normalScroll) > 2){
-        window.scrollTo(0, normalScroll);
+      if(Math.abs((window.scrollY||0)-normalScroll)>2){
+        window.scrollTo(0,normalScroll);
       }
     }
 
-    input.addEventListener('focus', openChat);
-    input.addEventListener('click', openChat);
+    input.addEventListener('focus',open);
+    input.addEventListener('click',open);
 
-    input.addEventListener('blur', function(){
+    input.addEventListener('blur',function(){
       setTimeout(function(){
-        if(viewportKeyboardHeight() < 60) closeChat();
-      }, 180);
+        if(kbHeight()<60) close();
+      },180);
     });
 
     if(window.visualViewport){
-      window.visualViewport.addEventListener('resize', function(){
-        if(viewportKeyboardHeight() >= 60) apply();
-        else if(active) closeChat();
-      }, {passive:true});
-
-      window.visualViewport.addEventListener('scroll', function(){
-        if(active) apply();
-      }, {passive:true});
+      window.visualViewport.addEventListener('resize',function(){
+        if(kbHeight()>=60) place();
+        else if(active) close();
+      },{passive:true});
+      window.visualViewport.addEventListener('scroll',function(){
+        if(active) place();
+      },{passive:true});
     }
 
-    form.addEventListener('submit', function(){
+    window.addEventListener('resize',function(){
+      if(active) place();
+    },{passive:true});
+
+    form.addEventListener('submit',function(){
       setTimeout(function(){
-        if(viewportKeyboardHeight() < 60) closeChat();
-      }, 180);
+        if(kbHeight()<60) close();
+      },180);
     });
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
-</script>
-
-
-<style id="mobile-chat-position-fix-v19">
-@media screen and (max-width:650px) and (orientation:portrait){
-  body.chat-keyboard-open #mobileLobbyChatForm{
-    /* v18 places the bar too high. Keep all other layout untouched and
-       lower only the chat bar by one chat-bar height. */
-    transform: translateY(var(--chat-lower-offset, 0px)) !important;
-  }
-}
-</style>
-<script id="mobile-chat-position-fix-v19">
-(function(){
-  function init(){
-    var form=document.getElementById('mobileLobbyChatForm');
-    if(!form) return;
-
-    function setOffset(){
-      if(!document.body.classList.contains('chat-keyboard-open')) {
-        form.style.removeProperty('--chat-lower-offset');
-        return;
-      }
-      var h=form.getBoundingClientRect().height || 42;
-      document.documentElement.style.setProperty('--chat-lower-offset', h + 'px');
-    }
-
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize', setOffset, {passive:true});
-      window.visualViewport.addEventListener('scroll', setOffset, {passive:true});
-    }
-    window.addEventListener('resize', setOffset, {passive:true});
-    setInterval(setOffset, 250);
-    setOffset();
-  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
   else init();
 })();
