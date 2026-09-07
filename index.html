@@ -1151,6 +1151,25 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
+
+<style id="mobile-chat-keyboard-only-v16">
+@media screen and (max-width:650px) and (orientation:portrait){
+  body.mobile-chat-keyboard-open{
+    overflow:hidden!important;
+    height:100%!important;
+  }
+  body.mobile-chat-keyboard-open .mobile-chat-bar{
+    position:fixed!important;
+    left:10px!important;
+    right:10px!important;
+    bottom:var(--mobile-keyboard-bottom,0px)!important;
+    z-index:99999!important;
+    margin:0!important;
+    width:auto!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
@@ -1362,7 +1381,7 @@ function renderLobby(){document.body.classList.remove('game-active');
  const addLobby=(name,text,kind='')=>{const log=$('#lobbyChat');if(!log)return;const d=document.createElement('div');d.className='msg '+kind;d.innerHTML=`<strong>${esc(name)}</strong> ${esc(text)}`;log.appendChild(d);log.scrollTop=log.scrollHeight;if(kind==='join')SOUND.join();else if(kind==='leave')SOUND.leave()};
  state.players.forEach((p,i)=>addLobby(p.name,i===0?'joined the room!':'is in the room.','join'));
  $('#lobbyChatForm').onsubmit=e=>{e.preventDefault();const v=$('#lobbyMsg').value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');$('#lobbyMsg').value=''};
- $('#mobileLobbyChatForm').onsubmit=e=>{e.preventDefault();const input=$('#mobileLobbyMsg');const v=input.value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');input.value='';input.focus()};
+ $('#mobileLobbyChatForm').onsubmit=e=>{e.preventDefault();const input=$('#mobileLobbyMsg');const v=input.value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');input.value='';input.blur();document.body.classList.remove('mobile-chat-keyboard-open');document.documentElement.style.removeProperty('--mobile-keyboard-bottom');window.scrollTo(0,0)};
  const copy=async()=>{const val=isPublic?inviteUrl:$('#invite').value;try{await navigator.clipboard.writeText(val);toast('Invite link copied!')}catch{toast(val)}};
  $('#copyTop').onclick=copy;if($('#copy'))$('#copy').onclick=copy;
  if(isPublic){
@@ -1860,6 +1879,55 @@ function setLobbyTool(tool){state.eraser=false;state.tool=tool;state.shape='none
 
 document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:true});
 </script>
+
+<script id="mobile-chat-keyboard-only-js-v16">
+(function(){
+  let bound=false;
+  function updateKeyboardPosition(){
+    if(!document.body.classList.contains('mobile-chat-keyboard-open')) return;
+    const vv=window.visualViewport;
+    const overlap=vv ? Math.max(0, window.innerHeight-vv.height-vv.offsetTop) : 0;
+    document.documentElement.style.setProperty('--mobile-keyboard-bottom', overlap+'px');
+    window.scrollTo(0,0);
+  }
+  function openChatBar(input){
+    if(!input || !input.closest('.mobile-chat-bar')) return;
+    document.body.classList.add('mobile-chat-keyboard-open');
+    requestAnimationFrame(updateKeyboardPosition);
+    setTimeout(updateKeyboardPosition,80);
+    setTimeout(updateKeyboardPosition,250);
+  }
+  function closeChatBar(){
+    document.body.classList.remove('mobile-chat-keyboard-open');
+    document.documentElement.style.removeProperty('--mobile-keyboard-bottom');
+    window.scrollTo(0,0);
+  }
+  function bind(){
+    if(bound) return;
+    bound=true;
+    document.addEventListener('focusin',function(e){
+      if(e.target && e.target.id==='mobileLobbyMsg') openChatBar(e.target);
+    },true);
+    document.addEventListener('focusout',function(e){
+      if(e.target && e.target.id==='mobileLobbyMsg'){
+        setTimeout(function(){
+          if(document.activeElement!==e.target) closeChatBar();
+        },120);
+      }
+    },true);
+    document.addEventListener('submit',function(e){
+      if(e.target && e.target.id==='mobileLobbyChatForm') setTimeout(closeChatBar,0);
+    },true);
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize',updateKeyboardPosition);
+      window.visualViewport.addEventListener('scroll',updateKeyboardPosition);
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind);
+  else bind();
+})();
+</script>
+
 </body>
 </html>
 
