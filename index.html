@@ -1863,7 +1863,8 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 </script>
 
 
-<style id="mobile-chat-keyboard-final-v20">
+
+<style id="mobile-chat-keyboard-viewport-v21">
 @media screen and (max-width:650px) and (orientation:portrait){
   html.chat-keyboard-open,
   body.chat-keyboard-open{
@@ -1876,15 +1877,14 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     left:4px!important;
     right:4px!important;
     width:auto!important;
+    bottom:auto!important;
     z-index:99999!important;
-    /* Put the chat bar at the keyboard edge, not one full bar-height above it. */
-    bottom:max(4px, calc(var(--chat-kb-height, 0px) - 46px))!important;
     transform:none!important;
   }
 }
 </style>
 
-<script id="mobile-chat-keyboard-final-v20">
+<script id="mobile-chat-keyboard-viewport-v21">
 (function(){
   if(!window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
@@ -1894,27 +1894,49 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     if(!input || !form) return;
 
     var active=false;
-    var normalScroll=0;
+    var savedScroll=0;
 
-    function kbHeight(){
-      var vv=window.visualViewport;
-      if(!vv) return 0;
-      return Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop));
+    function vv(){
+      return window.visualViewport || null;
     }
 
     function place(){
       if(!active) return;
-      document.documentElement.style.setProperty('--chat-kb-height',kbHeight()+'px');
-      document.documentElement.classList.add('chat-keyboard-open');
-      document.body.classList.add('chat-keyboard-open');
+
+      var v=vv();
+      if(!v){
+        form.style.removeProperty('top');
+        return;
+      }
+
+      /*
+       * IMPORTANT:
+       * Do not calculate `bottom` from keyboard height.
+       * Android Chrome can report the layout/visual viewport differently,
+       * which creates the exact empty gap seen in the user's screenshot.
+       *
+       * Put the chat bar's bottom edge directly at the visual viewport's
+       * bottom edge instead.
+       */
+      var rect=form.getBoundingClientRect();
+      var barHeight=rect.height || 46;
+      var top=Math.round(v.offsetTop + v.height - barHeight - 4);
+
+      form.style.setProperty('top', top + 'px', 'important');
+      form.style.setProperty('bottom', 'auto', 'important');
     }
 
     function open(){
       if(!active){
-        normalScroll=window.scrollY||0;
+        savedScroll=window.scrollY || 0;
         active=true;
       }
+
+      document.documentElement.classList.add('chat-keyboard-open');
+      document.body.classList.add('chat-keyboard-open');
+
       place();
+      requestAnimationFrame(place);
       setTimeout(place,50);
       setTimeout(place,150);
       setTimeout(place,300);
@@ -1923,11 +1945,15 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     function close(){
       if(!active) return;
       active=false;
+
       document.documentElement.classList.remove('chat-keyboard-open');
       document.body.classList.remove('chat-keyboard-open');
-      document.documentElement.style.removeProperty('--chat-kb-height');
-      if(Math.abs((window.scrollY||0)-normalScroll)>2){
-        window.scrollTo(0,normalScroll);
+
+      form.style.removeProperty('top');
+      form.style.removeProperty('bottom');
+
+      if(Math.abs((window.scrollY || 0)-savedScroll)>2){
+        window.scrollTo(0,savedScroll);
       }
     }
 
@@ -1936,15 +1962,21 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 
     input.addEventListener('blur',function(){
       setTimeout(function(){
-        if(kbHeight()<60) close();
+        var v=vv();
+        var keyboardOpen=v ? (window.innerHeight-v.height-v.offsetTop >= 60) : false;
+        if(!keyboardOpen) close();
       },180);
     });
 
     if(window.visualViewport){
       window.visualViewport.addEventListener('resize',function(){
-        if(kbHeight()>=60) place();
-        else if(active) close();
+        if(!active) return;
+        var v=vv();
+        var keyboardOpen=v && (window.innerHeight-v.height-v.offsetTop >= 60);
+        if(keyboardOpen) place();
+        else close();
       },{passive:true});
+
       window.visualViewport.addEventListener('scroll',function(){
         if(active) place();
       },{passive:true});
@@ -1953,12 +1985,6 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     window.addEventListener('resize',function(){
       if(active) place();
     },{passive:true});
-
-    form.addEventListener('submit',function(){
-      setTimeout(function(){
-        if(kbHeight()<60) close();
-      },180);
-    });
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
