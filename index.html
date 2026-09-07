@@ -1152,20 +1152,24 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 </style>
 
 
-<style id="mobile-chat-keyboard-only-v16">
+<style id="mobile-chat-keyboard-stability-v16">
 @media screen and (max-width:650px) and (orientation:portrait){
-  body.mobile-chat-keyboard-open{
-    overflow:hidden!important;
-    height:100%!important;
-  }
-  body.mobile-chat-keyboard-open .mobile-chat-bar{
+  /* When the keyboard opens, keep the lobby itself fixed.
+     Only the chat bar is repositioned above the visual viewport/keyboard. */
+  body.mobile-keyboard-open:not(.game-active){
     position:fixed!important;
-    left:10px!important;
-    right:10px!important;
-    bottom:var(--mobile-keyboard-bottom,0px)!important;
-    z-index:99999!important;
-    margin:0!important;
-    width:auto!important;
+    left:0!important;
+    right:0!important;
+    width:100%!important;
+    overflow:hidden!important;
+  }
+
+  body.mobile-keyboard-open:not(.game-active) .mobile-chat-bar{
+    position:fixed!important;
+    left:4px!important;
+    right:4px!important;
+    bottom:var(--mobile-keyboard-bottom,5px)!important;
+    z-index:10001!important;
   }
 }
 </style>
@@ -1381,7 +1385,7 @@ function renderLobby(){document.body.classList.remove('game-active');
  const addLobby=(name,text,kind='')=>{const log=$('#lobbyChat');if(!log)return;const d=document.createElement('div');d.className='msg '+kind;d.innerHTML=`<strong>${esc(name)}</strong> ${esc(text)}`;log.appendChild(d);log.scrollTop=log.scrollHeight;if(kind==='join')SOUND.join();else if(kind==='leave')SOUND.leave()};
  state.players.forEach((p,i)=>addLobby(p.name,i===0?'joined the room!':'is in the room.','join'));
  $('#lobbyChatForm').onsubmit=e=>{e.preventDefault();const v=$('#lobbyMsg').value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');$('#lobbyMsg').value=''};
- $('#mobileLobbyChatForm').onsubmit=e=>{e.preventDefault();const input=$('#mobileLobbyMsg');const v=input.value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');input.value='';input.blur();document.body.classList.remove('mobile-chat-keyboard-open');document.documentElement.style.removeProperty('--mobile-keyboard-bottom');window.scrollTo(0,0)};
+ $('#mobileLobbyChatForm').onsubmit=e=>{e.preventDefault();const input=$('#mobileLobbyMsg');const v=input.value.trim();if(!v)return;addLobby(state.name||'Player',': '+v,'');input.value='';input.focus()};
  const copy=async()=>{const val=isPublic?inviteUrl:$('#invite').value;try{await navigator.clipboard.writeText(val);toast('Invite link copied!')}catch{toast(val)}};
  $('#copyTop').onclick=copy;if($('#copy'))$('#copy').onclick=copy;
  if(isPublic){
@@ -1880,51 +1884,100 @@ function setLobbyTool(tool){state.eraser=false;state.tool=tool;state.shape='none
 document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:true});
 </script>
 
-<script id="mobile-chat-keyboard-only-js-v16">
+<script id="mobile-chat-keyboard-stability-v16">
 (function(){
-  let bound=false;
-  function updateKeyboardPosition(){
-    if(!document.body.classList.contains('mobile-chat-keyboard-open')) return;
+  if(!window.matchMedia || !window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
+
+  const body=document.body;
+  const chat=document.getElementById('mobileLobbyChatForm');
+  const input=document.getElementById('mobileLobbyMsg');
+  if(!chat || !input) return;
+
+  let locked=false;
+  let savedScrollY=0;
+  let savedBodyTop='';
+  let savedBodyPosition='';
+  let savedBodyWidth='';
+  let savedBodyLeft='';
+  let savedBodyRight='';
+
+  function keyboardHeight(){
     const vv=window.visualViewport;
-    const overlap=vv ? Math.max(0, window.innerHeight-vv.height-vv.offsetTop) : 0;
-    document.documentElement.style.setProperty('--mobile-keyboard-bottom', overlap+'px');
-    window.scrollTo(0,0);
+    if(!vv) return 0;
+    return Math.max(0, Math.round(window.innerHeight-vv.height-vv.offsetTop));
   }
-  function openChatBar(input){
-    if(!input || !input.closest('.mobile-chat-bar')) return;
-    document.body.classList.add('mobile-chat-keyboard-open');
-    requestAnimationFrame(updateKeyboardPosition);
-    setTimeout(updateKeyboardPosition,80);
-    setTimeout(updateKeyboardPosition,250);
+
+  function updateChatPosition(){
+    if(!locked) return;
+    const h=keyboardHeight();
+    chat.style.setProperty('--mobile-keyboard-bottom', Math.max(5,h+5)+'px');
   }
-  function closeChatBar(){
-    document.body.classList.remove('mobile-chat-keyboard-open');
-    document.documentElement.style.removeProperty('--mobile-keyboard-bottom');
-    window.scrollTo(0,0);
+
+  function lockPage(){
+    if(locked) return;
+    savedScrollY=window.scrollY||document.documentElement.scrollTop||0;
+    savedBodyTop=body.style.top;
+    savedBodyPosition=body.style.position;
+    savedBodyWidth=body.style.width;
+    savedBodyLeft=body.style.left;
+    savedBodyRight=body.style.right;
+
+    body.classList.add('mobile-keyboard-open');
+    body.style.position='fixed';
+    body.style.top=(-savedScrollY)+'px';
+    body.style.left='0';
+    body.style.right='0';
+    body.style.width='100%';
+    locked=true;
+    updateChatPosition();
   }
-  function bind(){
-    if(bound) return;
-    bound=true;
-    document.addEventListener('focusin',function(e){
-      if(e.target && e.target.id==='mobileLobbyMsg') openChatBar(e.target);
-    },true);
-    document.addEventListener('focusout',function(e){
-      if(e.target && e.target.id==='mobileLobbyMsg'){
-        setTimeout(function(){
-          if(document.activeElement!==e.target) closeChatBar();
-        },120);
-      }
-    },true);
-    document.addEventListener('submit',function(e){
-      if(e.target && e.target.id==='mobileLobbyChatForm') setTimeout(closeChatBar,0);
-    },true);
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize',updateKeyboardPosition);
-      window.visualViewport.addEventListener('scroll',updateKeyboardPosition);
-    }
+
+  function unlockPage(){
+    if(!locked) return;
+    locked=false;
+    body.classList.remove('mobile-keyboard-open');
+    body.style.position=savedBodyPosition;
+    body.style.top=savedBodyTop;
+    body.style.width=savedBodyWidth;
+    body.style.left=savedBodyLeft;
+    body.style.right=savedBodyRight;
+    chat.style.removeProperty('--mobile-keyboard-bottom');
+    window.scrollTo(0,savedScrollY);
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind);
-  else bind();
+
+  input.addEventListener('touchstart',function(){
+    /* Freeze the document before Chrome gets a chance to scroll the focused input into view. */
+    lockPage();
+  },{passive:true});
+
+  input.addEventListener('focus',function(){
+    lockPage();
+    setTimeout(updateChatPosition,0);
+    setTimeout(updateChatPosition,80);
+    setTimeout(updateChatPosition,250);
+  });
+
+  input.addEventListener('blur',function(){
+    /* Keyboard closing is detected from visualViewport; blur alone can happen during send. */
+    setTimeout(function(){
+      if(keyboardHeight() < 40) unlockPage();
+    },120);
+  });
+
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',updateChatPosition,{passive:true});
+    window.visualViewport.addEventListener('scroll',updateChatPosition,{passive:true});
+  }
+
+  window.addEventListener('resize',function(){
+    if(locked) updateChatPosition();
+  },{passive:true});
+
+  chat.addEventListener('submit',function(){
+    setTimeout(function(){
+      if(keyboardHeight() < 40) unlockPage();
+    },120);
+  });
 })();
 </script>
 
