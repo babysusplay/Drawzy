@@ -2107,6 +2107,86 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 })();
 </script>
 
+
+<script id="cross-device-room-invite-fix">
+(function(){
+  /*
+   * Cross-device invite bridge.
+   * The existing page can continue to work locally; when the project exposes
+   * the Supabase client, room metadata is also written/read from a small
+   * `rooms` table. This does not alter drawing/UI code.
+   */
+  if(typeof window.supabase === 'undefined' || !window.supabase) return;
+
+  var client=window.supabase;
+  var roomCode=null;
+
+  function getRoomCode(){
+    try{
+      var p=new URLSearchParams(location.search);
+      return p.get('room') || p.get('roomCode') || null;
+    }catch(e){ return null; }
+  }
+
+  function makeCode(){
+    return Math.random().toString(36).slice(2,8).toUpperCase();
+  }
+
+  async function ensureRoom(){
+    roomCode=getRoomCode();
+    if(!roomCode) return;
+
+    try{
+      var result=await client.from('rooms').select('*').eq('room_code',roomCode).maybeSingle();
+      if(result && result.data){
+        window.dispatchEvent(new CustomEvent('drawzy:remote-room',{
+          detail:result.data
+        }));
+      }
+    }catch(e){
+      console.warn('Drawzy room lookup unavailable:',e);
+    }
+  }
+
+  window.DrawzyInvite={
+    getRoomCode:getRoomCode,
+    createRoom:async function(data){
+      var code=(data && data.room_code) || getRoomCode() || makeCode();
+      try{
+        var payload=Object.assign({},data||{},{
+          room_code:code,
+          updated_at:new Date().toISOString()
+        });
+        var result=await client.from('rooms').upsert(payload,{onConflict:'room_code'}).select().single();
+        if(result && result.data){
+          roomCode=code;
+          return result.data;
+        }
+      }catch(e){
+        console.warn('Drawzy room create/update failed:',e);
+      }
+      return null;
+    },
+    joinRoom:async function(code){
+      try{
+        var result=await client.from('rooms').select('*').eq('room_code',code).maybeSingle();
+        if(result && result.data){
+          window.dispatchEvent(new CustomEvent('drawzy:remote-room',{
+            detail:result.data
+          }));
+          return result.data;
+        }
+      }catch(e){
+        console.warn('Drawzy room join failed:',e);
+      }
+      return null;
+    }
+  };
+
+  ensureRoom();
+})();
+</script>
+
 </body>
 </html>
 
