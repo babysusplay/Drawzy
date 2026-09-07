@@ -1152,24 +1152,31 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 </style>
 
 
-<style id="mobile-chat-keyboard-stability-v16">
+<style id="mobile-chat-keyboard-real-fix-v17">
 @media screen and (max-width:650px) and (orientation:portrait){
-  /* When the keyboard opens, keep the lobby itself fixed.
-     Only the chat bar is repositioned above the visual viewport/keyboard. */
-  body.mobile-keyboard-open:not(.game-active){
+  html.mobile-chat-lock,
+  html.mobile-chat-lock body{
+    overflow:hidden!important;
+    overscroll-behavior:none!important;
+    touch-action:pan-x pan-y!important;
+  }
+  body.mobile-chat-lock{
     position:fixed!important;
     left:0!important;
     right:0!important;
     width:100%!important;
-    overflow:hidden!important;
   }
-
-  body.mobile-keyboard-open:not(.game-active) .mobile-chat-bar{
+  body.mobile-chat-lock .app{
+    position:relative!important;
+  }
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar.chat-keyboard-active{
     position:fixed!important;
     left:4px!important;
     right:4px!important;
-    bottom:var(--mobile-keyboard-bottom,5px)!important;
-    z-index:10001!important;
+    bottom:var(--chat-keyboard-bottom,6px)!important;
+    top:auto!important;
+    z-index:2147483000!important;
+    transform:none!important;
   }
 }
 </style>
@@ -1884,100 +1891,109 @@ function setLobbyTool(tool){state.eraser=false;state.tool=tool;state.shape='none
 document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:true});
 </script>
 
-<script id="mobile-chat-keyboard-stability-v16">
+<script id="mobile-chat-keyboard-real-fix-v17">
 (function(){
   if(!window.matchMedia || !window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
-  const body=document.body;
-  const chat=document.getElementById('mobileLobbyChatForm');
-  const input=document.getElementById('mobileLobbyMsg');
-  if(!chat || !input) return;
+  let locked=false, savedY=0, savedTop='';
+  const root=document.documentElement, body=document.body;
 
-  let locked=false;
-  let savedScrollY=0;
-  let savedBodyTop='';
-  let savedBodyPosition='';
-  let savedBodyWidth='';
-  let savedBodyLeft='';
-  let savedBodyRight='';
+  function getChat(){return document.getElementById('mobileLobbyChatForm')}
+  function getInput(){return document.getElementById('mobileLobbyMsg')}
 
-  function keyboardHeight(){
+  function keyboardInset(){
     const vv=window.visualViewport;
     if(!vv) return 0;
-    return Math.max(0, Math.round(window.innerHeight-vv.height-vv.offsetTop));
+    return Math.max(0, Math.round(window.innerHeight-(vv.height+vv.offsetTop)));
   }
 
-  function updateChatPosition(){
+  function placeChat(){
     if(!locked) return;
-    const h=keyboardHeight();
-    chat.style.setProperty('--mobile-keyboard-bottom', Math.max(5,h+5)+'px');
+    const chat=getChat();
+    if(!chat) return;
+    chat.classList.add('chat-keyboard-active');
+    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()+6)+'px');
   }
 
   function lockPage(){
-    if(locked) return;
-    savedScrollY=window.scrollY||document.documentElement.scrollTop||0;
-    savedBodyTop=body.style.top;
-    savedBodyPosition=body.style.position;
-    savedBodyWidth=body.style.width;
-    savedBodyLeft=body.style.left;
-    savedBodyRight=body.style.right;
-
-    body.classList.add('mobile-keyboard-open');
-    body.style.position='fixed';
-    body.style.top=(-savedScrollY)+'px';
-    body.style.left='0';
-    body.style.right='0';
-    body.style.width='100%';
+    if(locked) { placeChat(); return; }
+    savedY=window.scrollY||document.documentElement.scrollTop||0;
+    savedTop=body.style.top;
+    root.classList.add('mobile-chat-lock');
+    body.classList.add('mobile-chat-lock');
+    body.style.top=(-savedY)+'px';
     locked=true;
-    updateChatPosition();
+    placeChat();
+    /* Chrome can perform its focus-scroll a frame after focus; restore the saved page position. */
+    requestAnimationFrame(function(){window.scrollTo(0,savedY);placeChat()});
+    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},60);
+    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},180);
   }
 
   function unlockPage(){
     if(!locked) return;
+    const chat=getChat();
+    if(chat){
+      chat.classList.remove('chat-keyboard-active');
+      chat.style.removeProperty('--chat-keyboard-bottom');
+    }
     locked=false;
-    body.classList.remove('mobile-keyboard-open');
-    body.style.position=savedBodyPosition;
-    body.style.top=savedBodyTop;
-    body.style.width=savedBodyWidth;
-    body.style.left=savedBodyLeft;
-    body.style.right=savedBodyRight;
-    chat.style.removeProperty('--mobile-keyboard-bottom');
-    window.scrollTo(0,savedScrollY);
+    root.classList.remove('mobile-chat-lock');
+    body.classList.remove('mobile-chat-lock');
+    body.style.top=savedTop;
+    window.scrollTo(0,savedY);
   }
 
-  input.addEventListener('touchstart',function(){
-    /* Freeze the document before Chrome gets a chance to scroll the focused input into view. */
+  function inputTouch(e){
+    const input=getInput();
+    if(!input || e.target!==input) return;
+    /* Lock before the browser processes the focus gesture. */
     lockPage();
-  },{passive:true});
+  }
 
-  input.addEventListener('focus',function(){
-    lockPage();
-    setTimeout(updateChatPosition,0);
-    setTimeout(updateChatPosition,80);
-    setTimeout(updateChatPosition,250);
-  });
+  document.addEventListener('touchstart',inputTouch,{capture:true,passive:true});
+  document.addEventListener('pointerdown',function(e){
+    const input=getInput();
+    if(input && e.target===input) lockPage();
+  },{capture:true,passive:true});
 
-  input.addEventListener('blur',function(){
-    /* Keyboard closing is detected from visualViewport; blur alone can happen during send. */
-    setTimeout(function(){
-      if(keyboardHeight() < 40) unlockPage();
-    },120);
-  });
+  document.addEventListener('focusin',function(e){
+    const input=getInput();
+    if(input && e.target===input){
+      lockPage();
+      setTimeout(placeChat,0);
+      setTimeout(placeChat,100);
+      setTimeout(placeChat,300);
+    }
+  },true);
+
+  document.addEventListener('focusout',function(e){
+    const input=getInput();
+    if(input && e.target===input){
+      setTimeout(function(){
+        if(keyboardInset()<40) unlockPage();
+      },120);
+    }
+  },true);
+
+  document.addEventListener('submit',function(e){
+    if(e.target && e.target.id==='mobileLobbyChatForm'){
+      setTimeout(function(){
+        const input=getInput();
+        if(input) input.blur();
+        unlockPage();
+      },80);
+    }
+  },true);
 
   if(window.visualViewport){
-    window.visualViewport.addEventListener('resize',updateChatPosition,{passive:true});
-    window.visualViewport.addEventListener('scroll',updateChatPosition,{passive:true});
+    window.visualViewport.addEventListener('resize',placeChat,{passive:true});
+    window.visualViewport.addEventListener('scroll',function(){
+      if(locked){window.scrollTo(0,savedY);placeChat()}
+    },{passive:true});
   }
 
-  window.addEventListener('resize',function(){
-    if(locked) updateChatPosition();
-  },{passive:true});
-
-  chat.addEventListener('submit',function(){
-    setTimeout(function(){
-      if(keyboardHeight() < 40) unlockPage();
-    },120);
-  });
+  window.addEventListener('resize',function(){if(locked){window.scrollTo(0,savedY);placeChat()}},{passive:true});
 })();
 </script>
 
