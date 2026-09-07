@@ -2102,6 +2102,44 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 })();
 </script>
 
+
+<style id="mobile-chat-position-fix-v19">
+@media screen and (max-width:650px) and (orientation:portrait){
+  body.chat-keyboard-open #mobileLobbyChatForm{
+    /* v18 places the bar too high. Keep all other layout untouched and
+       lower only the chat bar by one chat-bar height. */
+    transform: translateY(var(--chat-lower-offset, 0px)) !important;
+  }
+}
+</style>
+<script id="mobile-chat-position-fix-v19">
+(function(){
+  function init(){
+    var form=document.getElementById('mobileLobbyChatForm');
+    if(!form) return;
+
+    function setOffset(){
+      if(!document.body.classList.contains('chat-keyboard-open')) {
+        form.style.removeProperty('--chat-lower-offset');
+        return;
+      }
+      var h=form.getBoundingClientRect().height || 42;
+      document.documentElement.style.setProperty('--chat-lower-offset', h + 'px');
+    }
+
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', setOffset, {passive:true});
+      window.visualViewport.addEventListener('scroll', setOffset, {passive:true});
+    }
+    window.addEventListener('resize', setOffset, {passive:true});
+    setInterval(setOffset, 250);
+    setOffset();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+  else init();
+})();
+</script>
+
 </body>
 </html>
 
