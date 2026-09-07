@@ -1152,6 +1152,35 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 </style>
 
 
+<style id="mobile-chat-keyboard-real-fix-v17">
+@media screen and (max-width:650px) and (orientation:portrait){
+  html.mobile-chat-lock,
+  html.mobile-chat-lock body{
+    overflow:hidden!important;
+    overscroll-behavior:none!important;
+    touch-action:pan-x pan-y!important;
+  }
+  body.mobile-chat-lock{
+    position:fixed!important;
+    left:0!important;
+    right:0!important;
+    width:100%!important;
+  }
+  body.mobile-chat-lock .app{
+    position:relative!important;
+  }
+  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar.chat-keyboard-active{
+    position:fixed!important;
+    left:4px!important;
+    right:4px!important;
+    bottom:var(--chat-keyboard-bottom,6px)!important;
+    top:auto!important;
+    z-index:2147483000!important;
+    transform:none!important;
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app"><div class="shell">
@@ -1862,35 +1891,143 @@ function setLobbyTool(tool){state.eraser=false;state.tool=tool;state.shape='none
 document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:true});
 </script>
 
+<script id="mobile-chat-keyboard-real-fix-v17">
+(function(){
+  if(!window.matchMedia || !window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
-<style id="mobile-chat-only-keyboard-v22">
+  let locked=false, savedY=0, savedTop='';
+  const root=document.documentElement, body=document.body;
+
+  function getChat(){return document.getElementById('mobileLobbyChatForm')}
+  function getInput(){return document.getElementById('mobileLobbyMsg')}
+
+  function keyboardInset(){
+    const vv=window.visualViewport;
+    if(!vv) return 0;
+    return Math.max(0, Math.round(window.innerHeight-(vv.height+vv.offsetTop)));
+  }
+
+  function placeChat(){
+    if(!locked) return;
+    const chat=getChat();
+    if(!chat) return;
+    chat.classList.add('chat-keyboard-active');
+    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()+6)+'px');
+  }
+
+  function lockPage(){
+    if(locked) { placeChat(); return; }
+    savedY=window.scrollY||document.documentElement.scrollTop||0;
+    savedTop=body.style.top;
+    root.classList.add('mobile-chat-lock');
+    body.classList.add('mobile-chat-lock');
+    body.style.top=(-savedY)+'px';
+    locked=true;
+    placeChat();
+    /* Chrome can perform its focus-scroll a frame after focus; restore the saved page position. */
+    requestAnimationFrame(function(){window.scrollTo(0,savedY);placeChat()});
+    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},60);
+    setTimeout(function(){window.scrollTo(0,savedY);placeChat()},180);
+  }
+
+  function unlockPage(){
+    if(!locked) return;
+    const chat=getChat();
+    if(chat){
+      chat.classList.remove('chat-keyboard-active');
+      chat.style.removeProperty('--chat-keyboard-bottom');
+    }
+    locked=false;
+    root.classList.remove('mobile-chat-lock');
+    body.classList.remove('mobile-chat-lock');
+    body.style.top=savedTop;
+    window.scrollTo(0,savedY);
+  }
+
+  function inputTouch(e){
+    const input=getInput();
+    if(!input || e.target!==input) return;
+    /* Lock before the browser processes the focus gesture. */
+    lockPage();
+  }
+
+  document.addEventListener('touchstart',inputTouch,{capture:true,passive:true});
+  document.addEventListener('pointerdown',function(e){
+    const input=getInput();
+    if(input && e.target===input) lockPage();
+  },{capture:true,passive:true});
+
+  document.addEventListener('focusin',function(e){
+    const input=getInput();
+    if(input && e.target===input){
+      lockPage();
+      setTimeout(placeChat,0);
+      setTimeout(placeChat,100);
+      setTimeout(placeChat,300);
+    }
+  },true);
+
+  document.addEventListener('focusout',function(e){
+    const input=getInput();
+    if(input && e.target===input){
+      setTimeout(function(){
+        if(keyboardInset()<40) unlockPage();
+      },120);
+    }
+  },true);
+
+  document.addEventListener('submit',function(e){
+    if(e.target && e.target.id==='mobileLobbyChatForm'){
+      setTimeout(function(){
+        const input=getInput();
+        if(input) input.blur();
+        unlockPage();
+      },80);
+    }
+  },true);
+
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',placeChat,{passive:true});
+    window.visualViewport.addEventListener('scroll',function(){
+      if(locked){window.scrollTo(0,savedY);placeChat()}
+    },{passive:true});
+  }
+
+  window.addEventListener('resize',function(){if(locked){window.scrollTo(0,savedY);placeChat()}},{passive:true});
+})();
+</script>
+
+
+
+<style id="v18-chat-only-up-fix">
 @media screen and (max-width:650px) and (orientation:portrait){
-  html.chat-only-kb-lock,
-  body.chat-only-kb-lock{
+  html.v18-chat-kb-open,
+  body.v18-chat-kb-open{
     overflow:hidden!important;
     overscroll-behavior:none!important;
   }
 
-  body.chat-only-kb-lock{
+  body.v18-chat-kb-open{
     position:fixed!important;
     left:0!important;
     right:0!important;
     width:100%!important;
   }
 
-  body.chat-only-kb-lock form#mobileLobbyChatForm.mobile-chat-bar{
+  body.v18-chat-kb-open #mobileLobbyChatForm{
     position:fixed!important;
     left:4px!important;
     right:4px!important;
+    width:auto!important;
+    z-index:99999!important;
+    bottom:calc(var(--v18-chat-kb-inset, 6px) + 18px)!important;
     top:auto!important;
-    bottom:var(--chat-only-kb-bottom,6px)!important;
-    z-index:2147483000!important;
     transform:none!important;
   }
 }
 </style>
 
-<script id="mobile-chat-only-keyboard-v22">
+<script id="v18-chat-only-up-fix">
 (function(){
   if(!window.matchMedia('(max-width:650px) and (orientation:portrait)').matches) return;
 
@@ -1899,115 +2036,70 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     var form=document.getElementById('mobileLobbyChatForm');
     if(!input || !form) return;
 
-    var locked=false;
-    var savedY=0;
-    var savedTop='';
+    var active=false, savedY=0, savedTop='';
 
-    function inset(){
+    function kbInset(){
       var v=window.visualViewport;
       if(!v) return 0;
-      return Math.max(0,Math.round(window.innerHeight-(v.height+v.offsetTop)));
+      return Math.max(0,Math.round(window.innerHeight-v.height-v.offsetTop));
     }
 
-    function positionChat(){
-      if(!locked) return;
-      document.body.classList.add('chat-only-kb-lock');
-      document.documentElement.classList.add('chat-only-kb-lock');
-      document.body.style.setProperty('--chat-only-kb-bottom',(inset()+4)+'px');
+    function place(){
+      if(!active) return;
+      document.documentElement.classList.add('v18-chat-kb-open');
+      document.body.classList.add('v18-chat-kb-open');
+      document.body.style.setProperty('--v18-chat-kb-inset',Math.max(6,kbInset()+4)+'px');
     }
 
-    function lock(){
-      if(locked){
-        positionChat();
-        return;
+    function openChat(){
+      if(!active){
+        savedY=window.scrollY||document.documentElement.scrollTop||0;
+        savedTop=document.body.style.top;
+        active=true;
       }
-
-      savedY=window.scrollY||document.documentElement.scrollTop||0;
-      savedTop=document.body.style.top;
-
-      document.documentElement.classList.add('chat-only-kb-lock');
-      document.body.classList.add('chat-only-kb-lock');
+      document.documentElement.classList.add('v18-chat-kb-open');
+      document.body.classList.add('v18-chat-kb-open');
       document.body.style.top=(-savedY)+'px';
-      locked=true;
-      positionChat();
-
-      setTimeout(function(){window.scrollTo(0,savedY);positionChat()},0);
-      setTimeout(function(){window.scrollTo(0,savedY);positionChat()},80);
-      setTimeout(function(){window.scrollTo(0,savedY);positionChat()},200);
+      place();
+      setTimeout(function(){window.scrollTo(0,savedY);place()},0);
+      setTimeout(function(){window.scrollTo(0,savedY);place()},80);
+      setTimeout(function(){window.scrollTo(0,savedY);place()},200);
     }
 
-    function unlock(){
-      if(!locked) return;
-      locked=false;
-
-      document.documentElement.classList.remove('chat-only-kb-lock');
-      document.body.classList.remove('chat-only-kb-lock');
+    function closeChat(){
+      if(!active) return;
+      active=false;
+      document.documentElement.classList.remove('v18-chat-kb-open');
+      document.body.classList.remove('v18-chat-kb-open');
       document.body.style.top=savedTop;
-      document.body.style.removeProperty('--chat-only-kb-bottom');
+      document.body.style.removeProperty('--v18-chat-kb-inset');
       form.style.removeProperty('bottom');
-
       window.scrollTo(0,savedY);
     }
 
-    /*
-     * Critical part: stop Chrome's automatic focus-scroll gesture.
-     * We then focus manually with preventScroll, so ONLY the chat bar
-     * is repositioned; the rest of the page remains where it was.
-     */
-    input.addEventListener('touchstart',function(e){
-      e.preventDefault();
-      lock();
-      try{
-        input.focus({preventScroll:true});
-      }catch(_){
-        input.focus();
-      }
-    },{passive:false});
+    input.addEventListener('focus',openChat);
+    input.addEventListener('click',openChat);
 
-    input.addEventListener('pointerdown',function(e){
-      if(e.pointerType==='touch') return;
-      lock();
-    },{passive:true});
-
-    input.addEventListener('focus',function(){
-      lock();
-      positionChat();
-      setTimeout(positionChat,50);
-      setTimeout(positionChat,150);
-      setTimeout(positionChat,300);
-    });
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize',function(){
+        if(active) place();
+      },{passive:true});
+      window.visualViewport.addEventListener('scroll',function(){
+        if(active) place();
+      },{passive:true});
+    }
 
     input.addEventListener('blur',function(){
       setTimeout(function(){
-        if(inset()<50) unlock();
+        if(kbInset()<50) closeChat();
       },180);
     });
 
     form.addEventListener('submit',function(){
       setTimeout(function(){
-        try{input.blur()}catch(_){}
-        unlock();
-      },80);
+        if(kbInset()<50) closeChat();
+      },180);
     });
-
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize',function(){
-        if(locked) positionChat();
-      },{passive:true});
-
-      window.visualViewport.addEventListener('scroll',function(){
-        if(locked){
-          window.scrollTo(0,savedY);
-          positionChat();
-        }
-      },{passive:true});
-    }
-
-    window.addEventListener('scroll',function(){
-      if(locked && Math.abs(window.scrollY-savedY)>1){
-        window.scrollTo(0,savedY);
-      }
-    },{passive:true});
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
