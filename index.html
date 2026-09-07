@@ -1912,7 +1912,7 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     const chat=getChat();
     if(!chat) return;
     chat.classList.add('chat-keyboard-active');
-    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()+6)+'px');
+    chat.style.setProperty('--chat-keyboard-bottom',Math.max(6,keyboardInset()-Math.round(window.innerHeight*0.05))+'px');
   }
 
   function lockPage(){
@@ -2099,20 +2099,6 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
   else init();
 })();
 </script>
-
-
-<style id="mobile-chatbar-gap-only-fix">
-@media screen and (max-width:650px) and (orientation:portrait){
-  /*
-   * Keep the working v18 scroll-lock exactly as-is.
-   * Only lower the focused chat bar into the empty strip above the keyboard.
-   * The bar's existing keyboard inset is reduced by its own height.
-   */
-  body:not(.game-active) form#mobileLobbyChatForm.mobile-chat-bar.chat-keyboard-active{
-    bottom:calc(var(--chat-keyboard-bottom, 6px) - 46px)!important;
-  }
-}
-</style>
 
 </body>
 </html>
