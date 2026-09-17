@@ -1452,7 +1452,13 @@ function setupLobbyCanvas(){
 }
 
 function playerHTML(p){return `<div class="player ${p.correct?'correct':''} ${p.host?'host':''}"><div class="p-av">${p.avatar}</div><div class="p-info"><div class="p-name">${esc(p.name)}</div><div class="p-score">${p.score} points</div></div>${p.host?'<span class="host-tag">HOST</span>':''}</div>`}
-function startCountdown(){
+function broadcastStartGame(){
+  if(state.role!=='host')return;
+  if(window.DrawzyRealtime&&typeof window.DrawzyRealtime.startGame==='function'){
+    window.DrawzyRealtime.startGame();
+  }
+}
+function startCountdown(remote){
  if(state.screen!=='lobby')return;
  let n=3;
  const old=app.innerHTML;
@@ -2369,7 +2375,19 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
 
   patchRenderLobby();
   window.DrawzySharedRoom={ready:true,host,join,loadPlayers:syncPlayers};
-  window.DrawzyRealtime={connect:subscribeRoom,loadPlayers:syncPlayers,sendChat,stop:async()=>{
+  window.DrawzyRealtime={connect:subscribeRoom,loadPlayers:syncPlayers,sendChat,startGame:async()=>{
+    const c=roomCode();
+    if(!c)return false;
+    await subscribeRoom(c);
+    if(!channel)return false;
+    const payload={room_code:c,player_id:getId(),ts:Date.now()};
+    // Repeat briefly so a guest that is finishing its channel subscription cannot miss the command.
+    for(let i=0;i<3;i++){
+      try{await channel.send({type:'broadcast',event:'game-start',payload});}catch(e){console.warn('[Drawzy] start broadcast failed:',e);}
+      if(i<2)await new Promise(r=>setTimeout(r,700));
+    }
+    return true;
+  },stop:async()=>{
     if(pollId)clearInterval(pollId);
     if(channel){try{await db.removeChannel(channel);}catch(e){}}
     channel=null;currentCode=null;
