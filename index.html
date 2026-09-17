@@ -1181,7 +1181,9 @@ body:not(.game-active) .lobby-settings .invite{display:none!important}
 }
 </style>
 
-</head>
+<style id="drawzy-chat-fixed-v19">
+.lobby-chat .chat-log,.game-active .chat .chat-log{flex:1!important;min-height:0!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;justify-content:flex-start!important;gap:6px!important}
+</style></head>
 <body>
 <div class="app"><div class="shell">
 
@@ -1373,7 +1375,7 @@ function renderLobby(){document.body.classList.remove('game-active');
       <div class="tool-menu" id="lobbyShapeMenu"><button class="tool" id="lobbyShapeBtn" title="Shapes">◇</button><div class="tool-menu-panel" style="grid-template-columns:repeat(2,40px)"><button class="tool shapePick" data-shape="none">✎</button><button class="tool shapePick" data-shape="circle">○</button><button class="tool shapePick" data-shape="square">□</button><button class="tool shapePick" data-shape="triangle">△</button></div></div>
       <button class="tool" id="lobbyEraser" title="Eraser">⌫</button><button class="tool" id="lobbyClear" title="Clear">🧹</button><input class="tool-range" id="lobbySize" type="range" min="2" max="30" value="7">
     </div>
-    <div class="pre-game-note"><span class="muted">Draw here while you wait.</span><div style="display:flex;gap:7px"><button class="btn danger" id="publicLeave">Leave</button><button class="btn green" id="publicStart">▶ Start</button></div></div>
+    <div class="pre-game-note"><span class="muted">Draw here while you wait.</span><div style="display:flex;gap:7px"><button class="btn danger" id="publicLeave">Leave</button>${state.role==='host'?'<button class="btn green" id="publicStart">▶ Start</button>':''}</div></div>
    </main>` : `
    <main class="lobby-center">
     <div class="lobby-titlebar"><div><div class="kicker">ROOM SETUP</div><h1>Ready to draw?</h1></div><div class="lobby-actions"><button class="btn pink" id="copyTop">🔗 Invite</button></div></div>
@@ -1391,7 +1393,7 @@ function renderLobby(){document.body.classList.remove('game-active');
       </div>
       <div class="custom-word-box"><div class="custom-word-head"><label>CUSTOM WORDS <span class="muted">(OPTIONAL)</span></label><span class="muted">Separate with commas</span></div><textarea class="textarea compact-textarea" id="lobbyWords" placeholder="cat, rocket, pizza, castle...">${esc(s.customWords)}</textarea><div class="custom-source-note"><span id="wordSourceNote">${s.wordSource==='custom'?'Only these words will be used.':s.wordSource==='mixed'?'Custom and random words will be mixed.':'Random words will be used.'}</span></div></div>
       <div class="invite"><input class="input" id="invite" readonly value="${esc(inviteUrl)}"><button class="btn pink" id="copy">Copy</button></div>
-      <div class="room-tools"><button class="btn danger" id="leave">Leave</button><button class="btn green" id="start">▶ START GAME</button></div>
+      <div class="room-tools"><button class="btn danger" id="leave">Leave</button>${state.role==='host'?'<button class="btn green" id="start">▶ START GAME</button>':''}</div>
     </div>
    </main>`;
  app.innerHTML=`<div class="card room-head"><div class="compact-code"><div><div class="kicker">DRAWZY ROOM</div><div class="code-pill">${esc(state.room.code)}</div></div></div><div class="room-code"><span class="mini-status">● WAITING</span><small>${state.players.length}/${s.players} players • ${isPublic?'min 5 to start':'no minimum'}</small></div><div class="timer">👑 ${esc(state.room.host)}</div></div>
@@ -1408,13 +1410,13 @@ function renderLobby(){document.body.classList.remove('game-active');
  $('#copyTop').onclick=copy;if($('#copy'))$('#copy').onclick=copy;
  if(isPublic){
    setupLobbyCanvas();
-   $('#publicStart').onclick=()=>{if(state.players.length<5){toast('Play needs at least 5 players to start.');return}startCountdown()};
+   $('#publicStart').onclick=()=>{if(state.role!=='host')return;if(state.players.length<5){toast('Play needs at least 5 players to start.');return}broadcastStartGame();startCountdown()};
    $('#publicLeave').onclick=home;
    $('#roomSettings').onclick=()=>openRoomSettings();
  }else{
    const syncSettings=()=>{state.settings.players=+$('#players').value;state.settings.drawTime=+$('#drawTime').value;state.settings.rounds=+$('#rounds').value;state.settings.hints=+$('#hints').value;state.settings.mode=$('#mode').value;state.settings.wordCount=+$('#wordCount').value;state.settings.difficulty=$('#difficulty').value;state.settings.wordSource=$('#wordSource').value;updateWordSourceNote();updateLobbyStatus()};
    ['players','drawTime','rounds','hints','mode','wordCount','difficulty','wordSource'].forEach(id=>$('#'+id).onchange=syncSettings);$('#lobbyWords').oninput=e=>state.settings.customWords=e.target.value;
-   $('#start').onclick=()=>startCountdown();$('#leave').onclick=home;
+   $('#start').onclick=()=>{if(state.role!=='host')return;broadcastStartGame();startCountdown()};$('#leave').onclick=home;
  }
 }
 function updateWordSourceNote(){const el=$('#wordSourceNote');if(el)el.textContent=state.settings.wordSource==='custom'?'Only these words will be used.':state.settings.wordSource==='mixed'?'Custom and random words will be mixed.':'Random words will be used.'}
@@ -1717,6 +1719,7 @@ function quickPlay(){
   state.room.host=publicRoom.hostName||state.name;
   state.screen='lobby';
   render();
+  if(state.role==='host' && window.DrawzySharedRoom&&DrawzySharedRoom.ready) DrawzySharedRoom.host();
   announceLobbyJoin(state.name);
 }
 
@@ -1751,12 +1754,12 @@ function renderLobby(){
       <div class="tool-menu" id="lobbyShapeMenu"><button class="tool" id="lobbyShapeBtn" title="Shapes">◇</button><div class="tool-menu-panel" style="grid-template-columns:repeat(2,40px)"><button class="tool shapePick" data-shape="none">✎</button><button class="tool shapePick" data-shape="circle">○</button><button class="tool shapePick" data-shape="square">□</button><button class="tool shapePick" data-shape="triangle">△</button></div></div>
       <button class="tool" id="lobbyEraser" title="Eraser">⌫</button><button class="tool" id="lobbyClear" title="Clear">🧹</button><input class="tool-range" id="lobbySize" type="range" min="2" max="30" value="7">
     </div>
-    <div class="room-tools"><button class="btn danger" id="publicLeave">Leave</button><button class="btn green" id="publicStart">▶ Start</button></div>
+    <div class="room-tools"><button class="btn danger" id="publicLeave">Leave</button>${state.role==='host'?'<button class="btn green" id="publicStart">▶ Start</button>':''}</div>
    </main>`:`
    <main class="lobby-center">
     <div class="lobby-titlebar"><div><div class="kicker">ROOM SETUP</div><h1>Ready to draw?</h1></div><div class="lobby-actions"><button class="btn pink" id="copyTop">🔗 Invite</button></div></div>
     <div class="lobby-settings compact-settings">${settingsControls}
-      <div class="room-tools"><button class="btn danger" id="leave">Leave</button><button class="btn green" id="start">▶ START GAME</button></div>
+      <div class="room-tools"><button class="btn danger" id="leave">Leave</button>${state.role==='host'?'<button class="btn green" id="start">▶ START GAME</button>':''}</div>
     </div>
     <div class="mobile-lobby-canvas" aria-hidden="true"></div>
    </main>`;
@@ -1782,12 +1785,12 @@ function renderLobby(){
 
   if(isPublic){
     setupLobbyCanvas();
-    $('#publicStart').onclick=()=>{if(state.players.length<5){toast('Play needs at least 5 players to start.');return}startCountdown()};
+    $('#publicStart').onclick=()=>{if(state.role!=='host')return;if(state.players.length<5){toast('Play needs at least 5 players to start.');return}broadcastStartGame();startCountdown()};
     $('#publicLeave').onclick=home;
   }else{
     const syncSettings=()=>{state.settings.players=Math.max(1,Math.min(30,+$('#players').value));state.settings.drawTime=+$('#drawTime').value;state.settings.rounds=+$('#rounds').value;state.settings.hints=+$('#hints').value;state.settings.difficulty=$('#difficulty').value;state.settings.wordCount=+$('#wordCount').value;state.settings.mode=$('#mode').value;state.settings.wordSource=$('#customOnly')?.checked?'custom':'random';updateWordSourceNote();updateLobbyStatus()};
     ['players','drawTime','rounds','hints','difficulty','wordCount','mode','wordSource'].forEach(id=>$('#'+id).onchange=syncSettings);
-    $('#start').onclick=()=>{if(state.settings.wordSource==='custom'){const count=(state.settings.customWords||'').split(',').map(x=>x.trim()).filter(Boolean).length;if(count<40){toast(`Add at least 40 custom words (${count}/40).`);return}}startCountdown()};$('#leave').onclick=home;
+    $('#start').onclick=()=>{if(state.role!=='host')return;if(state.settings.wordSource==='custom'){const count=(state.settings.customWords||'').split(',').map(x=>x.trim()).filter(Boolean).length;if(count<40){toast(`Add at least 40 custom words (${count}/40).`);return}}broadcastStartGame();startCountdown()};$('#leave').onclick=home;
   }
   if(window.matchMedia('(max-width: 820px)').matches){
     const invite=async()=>{try{await navigator.clipboard.writeText(inviteUrl);toast('Invite link copied!')}catch{toast(inviteUrl)}};
@@ -2157,31 +2160,22 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
     try{return state && state.room && state.room.code ? state.room.code : null;}catch(e){return null;}
   }
 
-  function appendChat(name,text,kind=''){
-    const cleanName=escText(name), cleanText=escText(text);
-    chatHistory.push({name:cleanName,text:cleanText,kind});
-    if(chatHistory.length>100) chatHistory.shift();
-    const log=document.getElementById('lobbyChat');
-    if(!log) return;
-    const d=document.createElement('div');
-    d.className='msg '+(kind||'');
-    d.innerHTML='<strong>'+esc(cleanName)+'</strong> '+esc(cleanText);
-    log.appendChild(d);
-    log.scrollTop=log.scrollHeight;
-  }
-
-  function redrawChat(){
-    const log=document.getElementById('lobbyChat');
-    if(!log) return;
+  const MAX_VISIBLE_CHAT=7;
+  function renderVisibleLobbyChat(){
+    const log=document.getElementById('lobbyChat');if(!log)return;
     log.innerHTML='';
-    for(const m of chatHistory){
-      const d=document.createElement('div');
-      d.className='msg '+(m.kind||'');
-      d.innerHTML='<strong>'+esc(m.name)+'</strong> '+esc(m.text);
-      log.appendChild(d);
+    for(const m of chatHistory.slice(-MAX_VISIBLE_CHAT).reverse()){
+      const d=document.createElement('div');d.className='msg '+(m.kind||'');
+      d.innerHTML='<strong>'+esc(m.name)+'</strong> '+esc(m.text);log.appendChild(d);
     }
-    log.scrollTop=log.scrollHeight;
+    log.scrollTop=0;
   }
+  function appendChat(name,text,kind=''){
+    chatHistory.push({name:escText(name),text:escText(text),kind});
+    if(chatHistory.length>100)chatHistory.shift();
+    renderVisibleLobbyChat();
+  }
+  function redrawChat(){renderVisibleLobbyChat();}
 
   function updatePlayerDOM(){
     if(!state || state.screen!=='lobby') return;
@@ -2235,6 +2229,11 @@ document.addEventListener('pointerdown',()=>SOUND.ensure(),{once:true,passive:tr
       const p=payload && payload.payload;
       if(!p || p.room_code!==c || p.player_id===getId()) return;
       appendChat(p.player_name||'Player',': '+(p.text||''));
+    });
+    channel.on('broadcast',{event:'game-start'},payload=>{
+      const p=payload && payload.payload;
+      if(!p || p.room_code!==c || p.player_id===getId()) return;
+      if(state.screen==='lobby') startCountdown(true);
     });
 
     channel.on('presence',{event:'sync'},()=>{
